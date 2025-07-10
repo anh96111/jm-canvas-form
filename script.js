@@ -1,322 +1,232 @@
-// Global variables
-let canvasItems = [];
-let currentCanvasIndex = 0;
+// Global Variables
+let currentCanvas = 0;
+let canvasData = [];
 let cropper = null;
-let currentCropCanvasId = null;
-let currentLang = 'en';
-let backgroundImage = null;
-let isMultiCanvas = false;
+let currentCropInput = null;
+let currentLanguage = 'en';
 
-// Prices
-const PRICES = {
-    '8x10': 34,
-    '11x14': 43,
-    '16x20': 62,
-    '20x30': 82
-};
-
-// Initialize
-document.addEventListener('DOMContentLoaded', function() {
-    // Load background image
-    backgroundImage = new Image();
-    backgroundImage.src = 'preview-bg.jpg';
-    backgroundImage.onload = function() {
-        initializeForm();
-    };
-});
-
-function initializeForm() {
-    // Get URL parameters
-    const params = new URLSearchParams(window.location.search);
-    const fbName = params.get('name') || '';
-    const lang = params.get('lang') || detectLanguage();
-    
-    // Set Facebook name
-    document.getElementById('fbName').value = fbName;
-    
-    // Set language
-    currentLang = lang;
-    updateLanguage();
-    
-    // Initialize with single canvas
-    addCanvas(0);
-    updatePricing();
-}
-
-// Language detection
-function detectLanguage() {
-    const browserLang = navigator.language || navigator.userLanguage;
-    return browserLang.startsWith('es') ? 'es' : 'en';
-}
-
-// Update language
-function updateLanguage() {
-    document.querySelectorAll('[data-translate]').forEach(element => {
-        const key = element.getAttribute('data-translate');
-        if (translations[currentLang] && translations[currentLang][key]) {
-            element.textContent = translations[currentLang][key];
-        }
-    });
-}
-
-// Toggle multi canvas mode
-function toggleMultiCanvas() {
-    const checkbox = document.getElementById('multiCanvasToggle');
-    const quantitySection = document.getElementById('canvasQuantitySection');
-    
-    isMultiCanvas = checkbox.checked;
-    
-    if (isMultiCanvas) {
-        quantitySection.style.display = 'block';
-        updateCanvasCount();
-    } else {
-        quantitySection.style.display = 'none';
-        // Reset to single canvas
-        while (canvasItems.length > 1) {
-            canvasItems.pop();
-        }
-        updateCanvasTabs();
-        updatePricing();
+// Initialize canvas data structure
+function initializeCanvas(index) {
+    if (!canvasData[index]) {
+        canvasData[index] = {
+            size: '',
+            images: [],
+            text: '',
+            date: '',
+            welcomeHome: false,
+            quantity: 1
+        };
     }
 }
 
-// Update canvas count
-function updateCanvasCount() {
-    const quantity = parseInt(document.getElementById('canvasQuantity').value);
-    
-    // Preserve existing data
-    const existingData = [...canvasItems];
-    
-    // Adjust canvas items array
-    while (canvasItems.length < quantity) {
-        addCanvas(canvasItems.length);
-    }
-    while (canvasItems.length > quantity) {
-        canvasItems.pop();
-    }
-    
-    // Restore data where possible
-    existingData.forEach((data, index) => {
-        if (index < canvasItems.length) {
-            canvasItems[index] = data;
-        }
-    });
-    
-    updateCanvasTabs();
-    updatePricing();
-    showDiscountNotification(quantity);
-}
+// Initialize first canvas
+initializeCanvas(0);
 
-// Show discount notification
-function showDiscountNotification(quantity) {
-    const notification = document.getElementById('discountNotification');
-    const discountText = document.querySelector('.discount-text');
-    
-    if (quantity >= 5) {
-        notification.style.display = 'flex';
-        discountText.setAttribute('data-translate', 'discountText12');
-        discountText.textContent = translations[currentLang].discountText12;
-    } else if (quantity >= 3) {
-        notification.style.display = 'flex';
-        discountText.setAttribute('data-translate', 'discountText5');
-        discountText.textContent = translations[currentLang].discountText5;
-    } else {
-        notification.style.display = 'none';
-    }
-}
-
-// Add canvas
-function addCanvas(index) {
-    const canvasItem = {
-        id: Date.now() + index,
-        index: index,
-        size: '',
-        price: 0,
-        imageFile: null,
-        croppedImage: null,
-        text: '',
-        date: '',
-        welcomeHome: false
-    };
-    
-    canvasItems[index] = canvasItem;
-}
-
-// Update canvas tabs
-function updateCanvasTabs() {
-    const tabsContainer = document.getElementById('canvasTabs');
-    const itemsContainer = document.getElementById('canvasItemsContainer');
-    
-    // Clear existing
-    tabsContainer.innerHTML = '';
-    itemsContainer.innerHTML = '';
-    
-    // Create tabs and items
-    canvasItems.forEach((item, index) => {
-        // Create tab
-        const tab = document.createElement('div');
-        tab.className = 'tab' + (index === currentCanvasIndex ? ' active' : '');
-        tab.textContent = `${translations[currentLang].canvasNumber} ${index + 1}`;
-        tab.onclick = () => switchCanvas(index);
-        tabsContainer.appendChild(tab);
-        
-        // Create canvas item
-        const canvasHtml = createCanvasItemHtml(item, index);
-        itemsContainer.insertAdjacentHTML('beforeend', canvasHtml);
-    });
-    
-    // Show current canvas
-    switchCanvas(currentCanvasIndex);
-}
-
-// Create canvas item HTML
-function createCanvasItemHtml(item, index) {
+// Create canvas HTML structure
+function createCanvasHTML(index) {
     return `
-        <div class="canvas-item ${index === currentCanvasIndex ? 'active' : ''}" data-canvas-index="${index}">
+        <div class="canvas-item" data-canvas="${index}">
+            <!-- Size Selection -->
             <div class="form-group">
-                <label data-translate="selectSize">${translations[currentLang].selectSize}</label>
+                <label data-translate="selectSize">Select Size *</label>
                 <div class="size-selection">
                     <div class="size-option">
-                        <input type="radio" id="size-8x10-${index}" name="size-${index}" value="8x10" 
-                            ${item.size === '8x10' ? 'checked' : ''} 
-                            onchange="updateCanvasSize(${index}, '8x10')">
-                        <label for="size-8x10-${index}" class="size-label">
-                            <span class="size-name">8x10</span>
-                            <span class="size-price">$34</span>
-                        </label>
+                        <input type="radio" id="size-8x10-${index}" name="size-${index}" value="8x10" onchange="updateCanvasData(${index}, 'size', '8x10')">
+                        <label for="size-8x10-${index}">8"×10"<br>$25</label>
                     </div>
                     <div class="size-option">
-                        <input type="radio" id="size-11x14-${index}" name="size-${index}" value="11x14" 
-                            ${item.size === '11x14' ? 'checked' : ''} 
-                            onchange="updateCanvasSize(${index}, '11x14')">
-                        <label for="size-11x14-${index}" class="size-label">
-                            <span class="size-name">11x14</span>
-                            <span class="size-price">$43</span>
-                            <span class="best-seller">Best Seller</span>
-                        </label>
+                        <input type="radio" id="size-11x14-${index}" name="size-${index}" value="11x14" onchange="updateCanvasData(${index}, 'size', '11x14')">
+                        <label for="size-11x14-${index}">11"×14"<br>$35</label>
                     </div>
                     <div class="size-option">
-                        <input type="radio" id="size-16x20-${index}" name="size-${index}" value="16x20" 
-                            ${item.size === '16x20' ? 'checked' : ''} 
-                            onchange="updateCanvasSize(${index}, '16x20')">
-                        <label for="size-16x20-${index}" class="size-label">
-                            <span class="size-name">16x20</span>
-                            <span class="size-price">$62</span>
-                        </label>
+                        <input type="radio" id="size-16x20-${index}" name="size-${index}" value="16x20" onchange="updateCanvasData(${index}, 'size', '16x20')">
+                        <label for="size-16x20-${index}">16"×20"<br>$45</label>
                     </div>
                     <div class="size-option">
-                        <input type="radio" id="size-20x30-${index}" name="size-${index}" value="20x30" 
-                            ${item.size === '20x30' ? 'checked' : ''} 
-                            onchange="updateCanvasSize(${index}, '20x30')">
-                        <label for="size-20x30-${index}" class="size-label">
-                            <span class="size-name">20x30</span>
-                            <span class="size-price">$82</span>
-                        </label>
+                        <input type="radio" id="size-18x24-${index}" name="size-${index}" value="18x24" onchange="updateCanvasData(${index}, 'size', '18x24')">
+                        <label for="size-18x24-${index}">18"×24"<br>$55</label>
                     </div>
                 </div>
             </div>
-            
-            <div class="form-group">
-                <label data-translate="uploadPhoto">${translations[currentLang].uploadPhoto}</label>
-                <div class="file-upload-wrapper">
-                    <label class="file-upload-label" for="photo-${index}">
-                        <span id="photo-label-${index}">${item.imageFile ? item.imageFile.name : translations[currentLang].uploadPhoto}</span>
-                    </label>
-                    <input type="file" id="photo-${index}" accept="image/*" onchange="handlePhotoUpload(${index}, this)">
+
+            <!-- Image Upload -->
+            <div class="form-group image-upload-section">
+                <label data-translate="uploadImages">Upload Images *</label>
+                <input type="file" id="imageUpload-${index}" accept="image/*" multiple style="display: none;" onchange="handleImageUpload(event, ${index})">
+                <div class="upload-area" onclick="document.getElementById('imageUpload-${index}').click()">
+                    <div class="upload-icon">📷</div>
+                    <p data-translate="clickToUpload">Click to upload images</p>
                 </div>
-                <p class="upload-note" data-translate="uploadNote">${translations[currentLang].uploadNote}</p>
+                <div class="image-thumbnails" id="thumbnails-${index}"></div>
             </div>
-            
+
+            <!-- Text Input -->
             <div class="form-group">
-                <label data-translate="enterText">${translations[currentLang].enterText}</label>
-                <input type="text" id="text-${index}" value="${item.text}" onkeyup="updateCanvasText(${index}, this.value)" placeholder="Enter name or dedication">
+                <label data-translate="enterText">Enter your text</label>
+                <input type="text" id="canvasText-${index}" placeholder="Enter your custom text" onchange="updateCanvasData(${index}, 'text', this.value)">
             </div>
-            
+
+            <!-- Date Input -->
             <div class="form-group">
-                <label data-translate="enterDate">${translations[currentLang].enterDate}</label>
-                <input type="text" id="date-${index}" value="${item.date}" onkeyup="updateCanvasDate(${index}, this.value)" placeholder="1945-2023">
+                <label data-translate="selectDate">Select Date</label>
+                <input type="text" id="canvasDate-${index}" placeholder="e.g., 1999 ~ 2018" onchange="updateCanvasData(${index}, 'date', this.value)">
             </div>
-            
-            <div class="checkbox-wrapper">
-                <input type="checkbox" id="welcome-${index}" ${item.welcomeHome ? 'checked' : ''} onchange="updateWelcomeHome(${index}, this.checked)">
-                <label for="welcome-${index}" data-translate="welcomeHome">${translations[currentLang].welcomeHome}</label>
+
+            <!-- Welcome Home Checkbox -->
+            <div class="welcome-checkbox">
+                <input type="checkbox" id="welcomeHome-${index}" onchange="updateCanvasData(${index}, 'welcomeHome', this.checked)">
+                <label for="welcomeHome-${index}" data-translate="addWelcomeHome">Add "Welcome Home"</label>
             </div>
+
+            <!-- Quantity for Single Canvas -->
+            ${!document.getElementById('multiCanvasToggle').checked ? `
+                <div class="form-group">
+                    <label data-translate="quantity">Quantity</label>
+                    <input type="number" id="quantity-${index}" min="1" value="1" onchange="updateCanvasData(${index}, 'quantity', this.value)">
+                </div>
+            ` : ''}
         </div>
     `;
 }
 
-// Switch canvas
-function switchCanvas(index) {
-    currentCanvasIndex = index;
+// Toggle multi canvas mode
+function toggleMultiCanvas() {
+    const isMulti = document.getElementById('multiCanvasToggle').checked;
+    const quantitySection = document.getElementById('canvasQuantitySection');
+    const canvasTabs = document.getElementById('canvasTabs');
     
-    // Update tabs
-    document.querySelectorAll('.canvas-tabs .tab').forEach((tab, i) => {
+    if (isMulti) {
+        quantitySection.style.display = 'block';
+        canvasTabs.style.display = 'flex';
+        updateCanvasCount();
+    } else {
+        quantitySection.style.display = 'none';
+        canvasTabs.style.display = 'none';
+        canvasTabs.innerHTML = '<div class="tab active" onclick="switchCanvas(0)">Canvas 1</div>';
+        currentCanvas = 0;
+        renderCanvasItems();
+    }
+}
+
+// Update canvas count for multi-canvas
+function updateCanvasCount() {
+    const count = parseInt(document.getElementById('canvasQuantity').value);
+    const canvasTabs = document.getElementById('canvasTabs');
+    const discountNotification = document.getElementById('discountNotification');
+    
+    // Clear and rebuild tabs
+    canvasTabs.innerHTML = '';
+    for (let i = 0; i < count; i++) {
+        const tab = document.createElement('div');
+        tab.className = i === currentCanvas ? 'tab active' : 'tab';
+        tab.textContent = `Canvas ${i + 1}`;
+        tab.onclick = () => switchCanvas(i);
+        canvasTabs.appendChild(tab);
+        
+        initializeCanvas(i);
+    }
+    
+    // Show discount notification
+    if (count >= 3) {
+        discountNotification.style.display = 'flex';
+        const discountText = count >= 5 ? '12% discount applied!' : '5% discount applied!';
+        document.querySelector('.discount-text').textContent = discountText;
+    } else {
+        discountNotification.style.display = 'none';
+    }
+    
+    renderCanvasItems();
+    updatePriceTotal();
+}
+
+// Switch between canvas tabs
+function switchCanvas(index) {
+    currentCanvas = index;
+    const tabs = document.querySelectorAll('.tab');
+    tabs.forEach((tab, i) => {
         tab.classList.toggle('active', i === index);
     });
-    
-    // Update canvas items
-    document.querySelectorAll('.canvas-item').forEach((item, i) => {
-        item.classList.toggle('active', i === index);
-    });
-    
-    // Update preview
-    drawPreview();
+    renderCanvasItems();
+    updatePreview();
 }
 
-// Update canvas size
-function updateCanvasSize(index, size) {
-    canvasItems[index].size = size;
-    canvasItems[index].price = PRICES[size];
-    updatePricing();
-    if (index === currentCanvasIndex) {
-        drawPreview();
+// Render canvas items
+function renderCanvasItems() {
+    const container = document.getElementById('canvasItemsContainer');
+    container.innerHTML = createCanvasHTML(currentCanvas);
+    
+    // Restore data
+    const data = canvasData[currentCanvas];
+    if (data.size) {
+        document.getElementById(`size-${data.size}-${currentCanvas}`).checked = true;
+    }
+    if (data.text) {
+        document.getElementById(`canvasText-${currentCanvas}`).value = data.text;
+    }
+    if (data.date) {
+        document.getElementById(`canvasDate-${currentCanvas}`).value = data.date;
+    }
+    if (data.welcomeHome) {
+        document.getElementById(`welcomeHome-${currentCanvas}`).checked = true;
+    }
+    if (data.quantity && !document.getElementById('multiCanvasToggle').checked) {
+        document.getElementById(`quantity-${currentCanvas}`).value = data.quantity;
+    }
+    
+    // Render thumbnails
+    renderThumbnails(currentCanvas);
+    
+    // Update translations
+    updateTranslations();
+}
+
+// Handle image upload
+function handleImageUpload(event, canvasIndex) {
+    const files = event.target.files;
+    
+    for (let file of files) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            // Show crop modal
+            currentCropInput = { canvasIndex, file, imageData: e.target.result };
+            showCropModal(e.target.result);
+        };
+        reader.readAsDataURL(file);
     }
 }
 
-// Handle photo upload
-function handlePhotoUpload(index, input) {
-    if (input.files && input.files[0]) {
-        canvasItems[index].imageFile = input.files[0];
-        currentCropCanvasId = index;
-        
-        // Update label
-        document.getElementById(`photo-label-${index}`).textContent = input.files[0].name;
-        
-        // Open crop modal
-        openCropModal(input.files[0]);
-    }
-}
-
-// Open crop modal
-function openCropModal(file) {
+// Show crop modal
+function showCropModal(imageSrc) {
     const modal = document.getElementById('cropModal');
     const image = document.getElementById('cropImage');
     
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        image.src = e.target.result;
-        modal.style.display = 'flex';
-        
-        // Initialize cropper
+    image.src = imageSrc;
+    modal.style.display = 'flex';
+    
+    // Initialize cropper after image loads
+    image.onload = function() {
         if (cropper) {
             cropper.destroy();
         }
-        
         cropper = new Cropper(image, {
-            aspectRatio: 1,
+            aspectRatio: 8 / 10, // 8x10 ratio
             viewMode: 1,
             guides: true,
             center: true,
             highlight: true,
             background: true,
             autoCrop: true,
+            autoCropArea: 1,
             movable: true,
             rotatable: false,
             scalable: true,
-            zoomable: true
+            zoomable: true,
+            zoomOnTouch: true,
+            zoomOnWheel: true,
+            cropBoxMovable: true,
+            cropBoxResizable: true
         });
     };
-    reader.readAsDataURL(file);
 }
 
 // Cancel crop
@@ -326,270 +236,301 @@ function cancelCrop() {
         cropper = null;
     }
     document.getElementById('cropModal').style.display = 'none';
-    currentCropCanvasId = null;
+    currentCropInput = null;
 }
 
 // Apply crop
 function applyCrop() {
-    if (cropper && currentCropCanvasId !== null) {
-        const canvas = cropper.getCroppedCanvas({
-            width: 800,
-            height: 800
+    if (cropper && currentCropInput) {
+        const canvas = cropper.getCroppedCanvas();
+        const croppedImage = canvas.toDataURL('image/jpeg');
+        
+        // Add to canvas data
+        if (!canvasData[currentCropInput.canvasIndex].images) {
+            canvasData[currentCropInput.canvasIndex].images = [];
+        }
+        canvasData[currentCropInput.canvasIndex].images.push({
+            original: currentCropInput.imageData,
+            cropped: croppedImage,
+            file: currentCropInput.file
         });
         
-        canvas.toBlob(function(blob) {
-            canvasItems[currentCropCanvasId].croppedImage = blob;
-            
-            // Create object URL for preview
-            if (canvasItems[currentCropCanvasId].croppedImageUrl) {
-                URL.revokeObjectURL(canvasItems[currentCropCanvasId].croppedImageUrl);
-            }
-            canvasItems[currentCropCanvasId].croppedImageUrl = URL.createObjectURL(blob);
-            
-            // Close modal
-            cancelCrop();
-            
-            // Update preview if current canvas
-            if (currentCropCanvasId === currentCanvasIndex) {
-                drawPreview();
-            }
-        });
+        // Render thumbnails
+        renderThumbnails(currentCropInput.canvasIndex);
+        
+        // Show preview section
+        document.getElementById('previewSection').style.display = 'block';
+        updatePreview();
+        
+        // Clean up
+        cancelCrop();
     }
 }
 
-// Update canvas text
-function updateCanvasText(index, text) {
-    canvasItems[index].text = text;
-    if (index === currentCanvasIndex) {
-        drawPreview();
+// Render image thumbnails
+function renderThumbnails(canvasIndex) {
+    const container = document.getElementById(`thumbnails-${canvasIndex}`);
+    if (!container) return;
+    
+    container.innerHTML = '';
+    const images = canvasData[canvasIndex].images || [];
+    
+    images.forEach((img, index) => {
+        const thumbDiv = document.createElement('div');
+        thumbDiv.className = 'thumbnail-item';
+        thumbDiv.innerHTML = `
+            <img src="${img.cropped}" alt="Image ${index + 1}">
+            <button class="delete-thumb" onclick="deleteImage(${canvasIndex}, ${index})">×</button>
+        `;
+        container.appendChild(thumbDiv);
+    });
+}
+
+// Delete image
+function deleteImage(canvasIndex, imageIndex) {
+    canvasData[canvasIndex].images.splice(imageIndex, 1);
+    renderThumbnails(canvasIndex);
+    
+    // Hide preview if no images
+    if (canvasData[canvasIndex].images.length === 0) {
+        document.getElementById('previewSection').style.display = 'none';
     }
 }
 
-// Update canvas date
-function updateCanvasDate(index, date) {
-    canvasItems[index].date = date;
-    if (index === currentCanvasIndex) {
-        drawPreview();
+// Update canvas data
+function updateCanvasData(canvasIndex, field, value) {
+    canvasData[canvasIndex][field] = value;
+    updatePriceTotal();
+    
+    if (field === 'text' || field === 'date') {
+        updatePreview();
     }
 }
 
-// Update welcome home
-function updateWelcomeHome(index, checked) {
-    canvasItems[index].welcomeHome = checked;
-    if (index === currentCanvasIndex) {
-        drawPreview();
-    }
-}
-
-// Draw preview
-function drawPreview() {
+// Update preview
+function updatePreview() {
     const canvas = document.getElementById('previewCanvas');
     const ctx = canvas.getContext('2d');
-    const item = canvasItems[currentCanvasIndex];
     
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Draw background image
-    if (backgroundImage && backgroundImage.complete) {
-        ctx.drawImage(backgroundImage, 0, 0, canvas.width, canvas.height);
-    } else {
-        ctx.fillStyle = '#f0f0f0';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
+    // Load and draw background image
+    const bgImage = new Image();
+    bgImage.onload = function() {
+        // Draw background
+        ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
+        
+        // Get current canvas data
+        const data = canvasData[currentCanvas];
+        
+        // Draw text overlay
+        if (data.text) {
+            ctx.save();
+            
+            // Text styling
+            ctx.font = '40px Parisienne';
+            ctx.fillStyle = '#000000';
+            ctx.strokeStyle = 'rgba(139, 90, 43, 0.5)'; // Light brown stroke
+            ctx.lineWidth = 1;
+            ctx.textAlign = 'left';
+            
+            // Position text
+            const textX = 40;
+            const textY = canvas.height - 100;
+            
+            // Draw text with stroke
+            ctx.strokeText(data.text, textX, textY);
+            ctx.fillText(data.text, textX, textY);
+            
+            ctx.restore();
+        }
+        
+        // Draw date
+        if (data.date) {
+            ctx.save();
+            
+            // Date styling
+            ctx.font = '24px Amatic SC';
+            ctx.fillStyle = '#000000';
+            ctx.strokeStyle = 'rgba(139, 90, 43, 0.5)';
+            ctx.lineWidth = 0.5;
+            ctx.textAlign = 'left';
+            
+            // Position date below text
+            const dateX = 40;
+            const dateY = canvas.height - 60;
+            
+            // Draw date with stroke
+            ctx.strokeText(data.date, dateX, dateY);
+            ctx.fillText(data.date, dateX, dateY);
+            
+            ctx.restore();
+        }
+    };
     
-    // Draw text overlay
-    const padding = 30;
-    const lineHeight = 35;
-    let y = canvas.height - padding;
-    
-    // Set text style
-    ctx.textAlign = 'left';
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.lineWidth = 4;
-    
-    // Draw date if provided
-    if (item.date) {
-        ctx.font = 'bold 24px DateFont, Arial';
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeText(item.date, padding, y);
-        ctx.fillText(item.date, padding, y);
-        y -= lineHeight;
-    }
-    
-    // Draw main text
-    if (item.text) {
-        ctx.font = 'bold 28px TextFont, Arial';
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeText(item.text, padding, y);
-        ctx.fillText(item.text, padding, y);
-        y -= lineHeight;
-    }
-    
-    // Draw Welcome Home if checked
-    if (item.welcomeHome) {
-        y -= 10; // Extra spacing
-        ctx.font = 'bold 32px TextFont, Arial';
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeText('Welcome Home', padding, y);
-        ctx.fillText('Welcome Home', padding, y);
-    }
+    // Use the Jesus image as background
+    bgImage.src = 'background-demo.jpg';
 }
 
-// Update pricing
-function updatePricing() {
-    let subtotal = 0;
-    canvasItems.forEach(item => {
-        subtotal += item.price;
-    });
+// Calculate price
+function calculatePrice(size, quantity = 1) {
+    const prices = {
+        '8x10': 25,
+        '11x14': 35,
+        '16x20': 45,
+        '18x24': 55
+    };
+    return (prices[size] || 0) * quantity;
+}
+
+// Update price total
+function updatePriceTotal() {
+    let total = 0;
+    const isMulti = document.getElementById('multiCanvasToggle').checked;
     
-    let discount = 0;
-    if (canvasItems.length >= 5) {
-        discount = subtotal * 0.12;
-    } else if (canvasItems.length >= 3) {
-        discount = subtotal * 0.05;
+    if (isMulti) {
+        const count = parseInt(document.getElementById('canvasQuantity').value);
+        for (let i = 0; i < count; i++) {
+            if (canvasData[i] && canvasData[i].size) {
+                total += calculatePrice(canvasData[i].size);
+            }
+        }
+        
+        // Apply discount
+        if (count >= 5) {
+            total *= 0.88; // 12% off
+        } else if (count >= 3) {
+            total *= 0.95; // 5% off
+        }
+    } else {
+        if (canvasData[0] && canvasData[0].size) {
+            total = calculatePrice(canvasData[0].size, canvasData[0].quantity || 1);
+        }
     }
     
-    const total = subtotal - discount;
-    
-    // Update display
     document.querySelector('.total-price').textContent = `$${total.toFixed(2)}`;
+}
+
+// Validate form
+function validateForm() {
+    const fbName = document.getElementById('fbName').value.trim();
+    const email = document.getElementById('email').value.trim();
+    
+    if (!fbName) {
+        alert('Please enter your Facebook name');
+        return false;
+    }
+    
+    if (!email || !email.includes('@')) {
+        alert('Please enter a valid email address');
+        return false;
+    }
+    
+    // Check canvas data
+    const isMulti = document.getElementById('multiCanvasToggle').checked;
+    const canvasCount = isMulti ? parseInt(document.getElementById('canvasQuantity').value) : 1;
+    
+    for (let i = 0; i < canvasCount; i++) {
+        const data = canvasData[i];
+        if (!data || !data.size) {
+            alert(`Please select a size for Canvas ${i + 1}`);
+            switchCanvas(i);
+            return false;
+        }
+        
+        if (!data.images || data.images.length === 0) {
+            alert(`Please upload at least one image for Canvas ${i + 1}`);
+            switchCanvas(i);
+            return false;
+        }
+    }
+    
+    return true;
 }
 
 // Confirm order
 function confirmOrder() {
-    // Validate form
-    const email = document.getElementById('email').value;
-    if (!email) {
-        alert(translations[currentLang].required + ': Email');
-        return;
-    }
+    if (!validateForm()) return;
     
-    // Validate each canvas
-    for (let i = 0; i < canvasItems.length; i++) {
-        const item = canvasItems[i];
-        if (!item.size) {
-            alert(`${translations[currentLang].canvasNumber} ${i + 1}: ${translations[currentLang].selectSize}`);
-            switchCanvas(i);
-            return;
-        }
-        if (!item.imageFile) {
-            alert(`${translations[currentLang].canvasNumber} ${i + 1}: ${translations[currentLang].uploadPhoto}`);
-            switchCanvas(i);
-            return;
-        }
-        if (!item.text) {
-            alert(`${translations[currentLang].canvasNumber} ${i + 1}: ${translations[currentLang].enterText}`);
-            switchCanvas(i);
-            return;
-        }
-    }
+    // Build order summary
+    const isMulti = document.getElementById('multiCanvasToggle').checked;
+    const canvasCount = isMulti ? parseInt(document.getElementById('canvasQuantity').value) : 1;
     
-    // Show confirmation modal
-    showConfirmModal();
-}
-
-// Show confirmation modal
-function showConfirmModal() {
-    const modal = document.getElementById('confirmModal');
-    const summary = document.getElementById('orderSummary');
+    let summaryHTML = `
+        <p><strong>Customer:</strong> ${document.getElementById('fbName').value}</p>
+        <p><strong>Email:</strong> ${document.getElementById('email').value}</p>
+        <hr>
+    `;
     
-    let summaryHtml = '';
-    
-    canvasItems.forEach((item, index) => {
-        summaryHtml += `
-            <div class="order-item">
-                <h4>${translations[currentLang].canvasNumber} ${index + 1}</h4>
-                <div class="order-item-details">
-                    <span><strong>Size:</strong> ${item.size} - $${item.price}</span>
-                    <span><strong>Text:</strong> ${item.text}</span>
-                    <span><strong>Date:</strong> ${item.date || '-'}</span>
-                    <span><strong>Welcome Home:</strong> ${item.welcomeHome ? 'Yes' : 'No'}</span>
-                </div>
-            </div>
+    for (let i = 0; i < canvasCount; i++) {
+        const data = canvasData[i];
+        summaryHTML += `
+            <h4>Canvas ${i + 1}</h4>
+            <p>Size: ${data.size}"</p>
+            <p>Images: ${data.images.length} uploaded</p>
+            <p>Text: ${data.text || 'None'}</p>
+            <p>Date: ${data.date || 'None'}</p>
+            <p>Welcome Home: ${data.welcomeHome ? 'Yes' : 'No'}</p>
+            ${!isMulti ? `<p>Quantity: ${data.quantity || 1}</p>` : ''}
+            <hr>
         `;
-    });
+    }
     
-    summary.innerHTML = summaryHtml;
-    modal.style.display = 'flex';
+    const total = document.querySelector('.total-price').textContent;
+    summaryHTML += `<h3>Total: ${total}</h3>`;
+    
+    document.getElementById('orderSummary').innerHTML = summaryHTML;
+    document.getElementById('confirmModal').style.display = 'flex';
 }
 
-// Close confirm modal
+// Close confirmation modal
 function closeConfirmModal() {
     document.getElementById('confirmModal').style.display = 'none';
 }
 
 // Submit order
-async function submitOrder() {
-    try {
-        // Prepare form data
-        const formData = new FormData();
-        
-        // Add basic info
-        formData.append('fbName', document.getElementById('fbName').value);
-        formData.append('email', document.getElementById('email').value);
-        formData.append('notes', document.getElementById('notes').value);
-        formData.append('language', currentLang);
-        formData.append('timestamp', new Date().toISOString());
-        formData.append('order_type', isMultiCanvas ? 'multi' : 'single');
-        
-        // Add canvas data
-        formData.append('canvasCount', canvasItems.length);
-        
-        // Calculate totals
-        let subtotal = 0;
-        canvasItems.forEach(item => subtotal += item.price);
-        
-        let discount = 0;
-        if (canvasItems.length >= 5) discount = subtotal * 0.12;
-        else if (canvasItems.length >= 3) discount = subtotal * 0.05;
-        
-        formData.append('subtotal', subtotal);
-        formData.append('discount', discount);
-        formData.append('total', subtotal - discount);
-        
-        // Add each canvas data
-        canvasItems.forEach((item, index) => {
-            formData.append(`canvas_${index}_size`, item.size);
-            formData.append(`canvas_${index}_price`, item.price);
-            formData.append(`canvas_${index}_text`, item.text);
-            formData.append(`canvas_${index}_date`, item.date);
-            formData.append(`canvas_${index}_welcomeHome`, item.welcomeHome);
-            
-            // Add cropped image
-            if (item.croppedImage) {
-                formData.append(`canvas_${index}_image`, item.croppedImage, `canvas_${index}.jpg`);
-            } else if (item.imageFile) {
-                formData.append(`canvas_${index}_image`, item.imageFile);
-            }
-        });
-        
-        // TODO: Replace with your actual webhook URL
-        // const response = await fetch('YOUR_WEBHOOK_URL', {
-        //     method: 'POST',
-        //     body: formData
-        // });
-        
-        // For demo, just log the data
-        console.log('Order data prepared:', formData);
-        
-        // Show thank you page
-        closeConfirmModal();
-        showThankYouPage();
-        
-    } catch (error) {
-        console.error('Error submitting order:', error);
-        alert(translations[currentLang].errorSubmit);
-    }
-}
-
-// Show thank you page
-function showThankYouPage() {
+function submitOrder() {
+    // Here you would normally send the data to your server
+    // For now, we'll just show the thank you page
+    
+    document.getElementById('confirmModal').style.display = 'none';
     document.getElementById('thankYouPage').style.display = 'flex';
-    document.querySelector('.container').style.display = 'none';
+    
+    // Log order data (for debugging)
+    console.log('Order submitted:', {
+        customer: {
+            fbName: document.getElementById('fbName').value,
+            email: document.getElementById('email').value
+        },
+        canvases: canvasData,
+        notes: document.getElementById('notes').value
+    });
 }
 
 // Start new order
 function startNewOrder() {
-    window.location.reload();
+    location.reload();
 }
+
+// Update translations
+function updateTranslations() {
+    if (typeof translations === 'undefined') return;
+    
+    document.querySelectorAll('[data-translate]').forEach(element => {
+        const key = element.getAttribute('data-translate');
+        if (translations[currentLanguage] && translations[currentLanguage][key]) {
+            if (element.tagName === 'INPUT' || element.tagName === 'TEXTAREA') {
+                element.placeholder = translations[currentLanguage][key];
+            } else {
+                element.textContent = translations[currentLanguage][key];
+            }
+        }
+    });
+}
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    renderCanvasItems();
+    updateTranslations();
+});
