@@ -9,20 +9,18 @@
 </head>
 <body>
     <div class="container">
-        <!-- Header with Logo and Price Summary -->
+        <!-- Header with Logo -->
         <header class="header">
             <img src="logo.png" alt="JM-Canvas" class="logo">
             <h1>JM-Canvas Order Form</h1>
-            <div class="price-summary">
-                <div class="total-price">
-                    <span data-translate="total">Total</span>: 
-                    <span class="price-amount">$0</span>
-                </div>
-                <div class="discount-info" style="display: none;">
-                    <span class="discount-text"></span>
-                </div>
-            </div>
         </header>
+
+        <!-- Promotional Banner -->
+        <div class="promo-banner">
+            <div class="promo-text">
+                <span data-translate="promoText">🎁 Special Offer: Order 3+ canvas and get 5% OFF! Order 5+ canvas and get 12% OFF! 🎁</span>
+            </div>
+        </div>
 
         <!-- Form Container -->
         <div class="form-container">
@@ -39,30 +37,58 @@
                 </div>
             </div>
 
-            <!-- Canvas Items Container -->
-            <div class="canvas-items-container">
-                <!-- Canvas items will be dynamically added here -->
-            </div>
+            <!-- Canvas Order Type -->
+            <div class="form-section">
+                <h2 data-translate="orderType">Canvas Order</h2>
+                
+                <!-- Multi Canvas Checkbox -->
+                <div class="checkbox-wrapper">
+                    <input type="checkbox" id="multiCanvasToggle" onchange="toggleMultiCanvas()">
+                    <label for="multiCanvasToggle" data-translate="multiCanvasLabel">I want to order multiple different canvas</label>
+                </div>
+                
+                <!-- Canvas Quantity Selector (hidden by default) -->
+                <div id="canvasQuantitySection" style="display: none;">
+                    <div class="form-group">
+                        <label data-translate="selectQuantity">How many canvas?</label>
+                        <select id="canvasQuantity" onchange="updateCanvasCount()">
+                            <option value="2">2 Canvas</option>
+                            <option value="3">3 Canvas</option>
+                            <option value="4">4 Canvas</option>
+                            <option value="5">5 Canvas</option>
+                            <option value="6">6 Canvas</option>
+                            <option value="7">7 Canvas</option>
+                            <option value="8">8 Canvas</option>
+                            <option value="9">9 Canvas</option>
+                            <option value="10">10 Canvas</option>
+                        </select>
+                    </div>
+                    <div id="discountNotification" class="discount-notification" style="display: none;">
+                        <span class="discount-icon">🎉</span>
+                        <span class="discount-text" data-translate="discountText"></span>
+                    </div>
+                </div>
 
-            <!-- Add Canvas Button -->
-            <button class="add-canvas-btn" onclick="addNewCanvas()">
-                <span class="plus-icon">+</span>
-                <span data-translate="addCanvas">Add Another Canvas</span>
-            </button>
+                <!-- Canvas Tabs -->
+                <div id="canvasTabs" class="canvas-tabs">
+                    <div class="tab active" onclick="switchCanvas(0)">Canvas 1</div>
+                </div>
+
+                <!-- Canvas Items Container -->
+                <div id="canvasItemsContainer" class="canvas-items-container">
+                    <!-- Canvas items will be dynamically added here -->
+                </div>
+            </div>
 
             <!-- Preview Section -->
             <div class="preview-section">
                 <h2 data-translate="preview">Canvas Preview</h2>
-                <div class="preview-carousel-container">
-                    <button class="carousel-btn prev" onclick="changePreview(-1)">‹</button>
-                    <div class="preview-carousel">
-                        <div class="preview-slides" id="previewSlides">
-                            <!-- Preview canvases will be added here -->
-                        </div>
+                <div class="preview-container">
+                    <canvas id="previewCanvas" width="400" height="500"></canvas>
+                    <div class="preview-notice" data-translate="previewNotice">
+                        This is only a preview for your custom text. The final canvas preview will be sent to your email and Messenger.
                     </div>
-                    <button class="carousel-btn next" onclick="changePreview(1)">›</button>
                 </div>
-                <div class="preview-indicator" id="previewIndicator"></div>
             </div>
 
             <!-- Notes Section -->
@@ -71,6 +97,12 @@
                     <label data-translate="notes">Additional Notes</label>
                     <textarea id="notes" rows="3" placeholder="Special instructions..."></textarea>
                 </div>
+            </div>
+
+            <!-- Price Summary -->
+            <div class="price-summary-bottom">
+                <span data-translate="estimatedTotal">Estimated Total</span>: 
+                <span class="total-price">$0</span>
             </div>
 
             <!-- Submit Button -->
@@ -95,12 +127,24 @@
     <!-- Confirmation Modal -->
     <div id="confirmModal" class="modal">
         <div class="modal-content confirm-content">
-            <h3 data-translate="confirmOrder">Confirm Your Order</h3>
+            <h3 data-translate="confirmOrder">Review Your Order</h3>
             <div id="orderSummary"></div>
             <div class="confirm-buttons">
-                <button onclick="closeConfirmModal()" data-translate="edit">Edit Order</button>
-                <button onclick="submitOrder()" class="primary-btn" data-translate="confirmSubmit">Confirm & Submit</button>
+                <button onclick="closeConfirmModal()" data-translate="goBack">Go Back</button>
+                <button onclick="submitOrder()" class="primary-btn" data-translate="confirmSubmit">Confirm Order</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Thank You Page -->
+    <div id="thankYouPage" class="thank-you-page" style="display: none;">
+        <div class="thank-you-content">
+            <div class="thank-you-icon">✅</div>
+            <h2 data-translate="thankYouTitle">Thank You!</h2>
+            <p data-translate="thankYouMessage">
+                Your order has been received successfully. We'll send your canvas preview to your email and Messenger within 2-3 business days.
+            </p>
+            <button onclick="startNewOrder()" class="primary-btn" data-translate="newOrder">Place Another Order</button>
         </div>
     </div>
 

@@ -1,10 +1,11 @@
 // Global variables
 let canvasItems = [];
-let currentPreviewIndex = 0;
+let currentCanvasIndex = 0;
 let cropper = null;
-let currentCropIndex = null;
+let currentCropCanvasId = null;
 let currentLang = 'en';
 let backgroundImage = null;
+let isMultiCanvas = false;
 
 // Prices
 const PRICES = {
@@ -18,7 +19,7 @@ const PRICES = {
 document.addEventListener('DOMContentLoaded', function() {
     // Load background image
     backgroundImage = new Image();
-    backgroundImage.src = 'preview-bg.jpg'; // Your background image
+    backgroundImage.src = 'preview-bg.jpg';
     backgroundImage.onload = function() {
         initializeForm();
     };
@@ -37,8 +38,9 @@ function initializeForm() {
     currentLang = lang;
     updateLanguage();
     
-    // Add first canvas
-    addNewCanvas();
+    // Initialize with single canvas
+    addCanvas(0);
+    updatePricing();
 }
 
 // Language detection
@@ -57,11 +59,76 @@ function updateLanguage() {
     });
 }
 
-// Add new canvas
-function addNewCanvas() {
-    const index = canvasItems.length;
+// Toggle multi canvas mode
+function toggleMultiCanvas() {
+    const checkbox = document.getElementById('multiCanvasToggle');
+    const quantitySection = document.getElementById('canvasQuantitySection');
+    
+    isMultiCanvas = checkbox.checked;
+    
+    if (isMultiCanvas) {
+        quantitySection.style.display = 'block';
+        updateCanvasCount();
+    } else {
+        quantitySection.style.display = 'none';
+        // Reset to single canvas
+        while (canvasItems.length > 1) {
+            canvasItems.pop();
+        }
+        updateCanvasTabs();
+        updatePricing();
+    }
+}
+
+// Update canvas count
+function updateCanvasCount() {
+    const quantity = parseInt(document.getElementById('canvasQuantity').value);
+    
+    // Preserve existing data
+    const existingData = [...canvasItems];
+    
+    // Adjust canvas items array
+    while (canvasItems.length < quantity) {
+        addCanvas(canvasItems.length);
+    }
+    while (canvasItems.length > quantity) {
+        canvasItems.pop();
+    }
+    
+    // Restore data where possible
+    existingData.forEach((data, index) => {
+        if (index < canvasItems.length) {
+            canvasItems[index] = data;
+        }
+    });
+    
+    updateCanvasTabs();
+    updatePricing();
+    showDiscountNotification(quantity);
+}
+
+// Show discount notification
+function showDiscountNotification(quantity) {
+    const notification = document.getElementById('discountNotification');
+    const discountText = document.querySelector('.discount-text');
+    
+    if (quantity >= 5) {
+        notification.style.display = 'flex';
+        discountText.setAttribute('data-translate', 'discountText12');
+        discountText.textContent = translations[currentLang].discountText12;
+    } else if (quantity >= 3) {
+        notification.style.display = 'flex';
+        discountText.setAttribute('data-translate', 'discountText5');
+        discountText.textContent = translations[currentLang].discountText5;
+    } else {
+        notification.style.display = 'none';
+    }
+}
+
+// Add canvas
+function addCanvas(index) {
     const canvasItem = {
-        id: Date.now(),
+        id: Date.now() + index,
         index: index,
         size: '',
         price: 0,
@@ -72,61 +139,76 @@ function addNewCanvas() {
         welcomeHome: false
     };
     
-    canvasItems.push(canvasItem);
+    canvasItems[index] = canvasItem;
+}
+
+// Update canvas tabs
+function updateCanvasTabs() {
+    const tabsContainer = document.getElementById('canvasTabs');
+    const itemsContainer = document.getElementById('canvasItemsContainer');
     
-    const container = document.querySelector('.canvas-items-container');
-    const canvasHtml = createCanvasItemHtml(canvasItem);
-    container.insertAdjacentHTML('beforeend', canvasHtml);
+    // Clear existing
+    tabsContainer.innerHTML = '';
+    itemsContainer.innerHTML = '';
     
-    // Add preview canvas
-    addPreviewCanvas(index);
+    // Create tabs and items
+    canvasItems.forEach((item, index) => {
+        // Create tab
+        const tab = document.createElement('div');
+        tab.className = 'tab' + (index === currentCanvasIndex ? ' active' : '');
+        tab.textContent = `${translations[currentLang].canvasNumber} ${index + 1}`;
+        tab.onclick = () => switchCanvas(index);
+        tabsContainer.appendChild(tab);
+        
+        // Create canvas item
+        const canvasHtml = createCanvasItemHtml(item, index);
+        itemsContainer.insertAdjacentHTML('beforeend', canvasHtml);
+    });
     
-    // Update preview
-    currentPreviewIndex = index;
-    updatePreviewCarousel();
-    updatePricing();
+    // Show current canvas
+    switchCanvas(currentCanvasIndex);
 }
 
 // Create canvas item HTML
-function createCanvasItemHtml(item) {
-    const canvasNumber = item.index + 1;
+function createCanvasItemHtml(item, index) {
     return `
-        <div class="canvas-item" data-canvas-id="${item.id}">
-            <div class="canvas-item-header">
-                <h3 class="canvas-item-title">
-                    <span data-translate="canvasNumber">${translations[currentLang].canvasNumber}</span> ${canvasNumber}
-                </h3>
-                ${canvasItems.length > 1 ? `<button class="remove-canvas-btn" onclick="removeCanvas(${item.id})">×</button>` : ''}
-            </div>
-            
+        <div class="canvas-item ${index === currentCanvasIndex ? 'active' : ''}" data-canvas-index="${index}">
             <div class="form-group">
                 <label data-translate="selectSize">${translations[currentLang].selectSize}</label>
                 <div class="size-selection">
                     <div class="size-option">
-                        <input type="radio" id="size-8x10-${item.id}" name="size-${item.id}" value="8x10" onchange="updateCanvasSize(${item.id}, '8x10')">
-                        <label for="size-8x10-${item.id}" class="size-label">
+                        <input type="radio" id="size-8x10-${index}" name="size-${index}" value="8x10" 
+                            ${item.size === '8x10' ? 'checked' : ''} 
+                            onchange="updateCanvasSize(${index}, '8x10')">
+                        <label for="size-8x10-${index}" class="size-label">
                             <span class="size-name">8x10</span>
                             <span class="size-price">$34</span>
                         </label>
                     </div>
                     <div class="size-option">
-                        <input type="radio" id="size-11x14-${item.id}" name="size-${item.id}" value="11x14" onchange="updateCanvasSize(${item.id}, '11x14')">
-                        <label for="size-11x14-${item.id}" class="size-label">
+                        <input type="radio" id="size-11x14-${index}" name="size-${index}" value="11x14" 
+                            ${item.size === '11x14' ? 'checked' : ''} 
+                            onchange="updateCanvasSize(${index}, '11x14')">
+                        <label for="size-11x14-${index}" class="size-label">
                             <span class="size-name">11x14</span>
                             <span class="size-price">$43</span>
                             <span class="best-seller">Best Seller</span>
                         </label>
                     </div>
                     <div class="size-option">
-                        <input type="radio" id="size-16x20-${item.id}" name="size-${item.id}" value="16x20" onchange="updateCanvasSize(${item.id}, '16x20')">
-                        <label for="size-16x20-${item.id}" class="size-label">
+                        <input type="radio" id="size-16x20-${index}" name="size-${index}" value="16x20" 
+                            ${item.size === '16x20' ? 'checked' : ''} 
+                            onchange="updateCanvasSize(${index}, '16x20')">
+                        <label for="size-16x20-${index}" class="size-label">
                             <span class="size-name">16x20</span>
                             <span class="size-price">$62</span>
                         </label>
                     </div>
                     <div class="size-option">
-                        <input type="radio" id="size-20x30-${item.id}" name="size-${item.id}" value="20x30" onchange="updateCanvasSize(${item.id}, '20x30')">
-                        <label for="size-20x30-${item.id}" class="size-label">
+                        <input type="radio" id="size-20x30-${index}" name="size-${index}" value="20x30" 
+                            ${item.size === '20x30' ? 'checked' : ''} 
+                            onchange="updateCanvasSize(${index}, '20x30')">
+                        <label for="size-20x30-${index}" class="size-label">
                             <span class="size-name">20x30</span>
                             <span class="size-price">$82</span>
                         </label>
@@ -137,104 +219,71 @@ function createCanvasItemHtml(item) {
             <div class="form-group">
                 <label data-translate="uploadPhoto">${translations[currentLang].uploadPhoto}</label>
                 <div class="file-upload-wrapper">
-                    <label class="file-upload-label" for="photo-${item.id}">
-                        <span id="photo-label-${item.id}" data-translate="uploadPhoto">${translations[currentLang].uploadPhoto}</span>
+                    <label class="file-upload-label" for="photo-${index}">
+                        <span id="photo-label-${index}">${item.imageFile ? item.imageFile.name : translations[currentLang].uploadPhoto}</span>
                     </label>
-                    <input type="file" id="photo-${item.id}" accept="image/*" onchange="handlePhotoUpload(${item.id}, this)">
+                    <input type="file" id="photo-${index}" accept="image/*" onchange="handlePhotoUpload(${index}, this)">
                 </div>
                 <p class="upload-note" data-translate="uploadNote">${translations[currentLang].uploadNote}</p>
             </div>
             
             <div class="form-group">
                 <label data-translate="enterText">${translations[currentLang].enterText}</label>
-                <input type="text" id="text-${item.id}" onkeyup="updateCanvasText(${item.id}, this.value)" placeholder="Enter name or dedication">
+                <input type="text" id="text-${index}" value="${item.text}" onkeyup="updateCanvasText(${index}, this.value)" placeholder="Enter name or dedication">
             </div>
             
             <div class="form-group">
                 <label data-translate="enterDate">${translations[currentLang].enterDate}</label>
-                <input type="text" id="date-${item.id}" onkeyup="updateCanvasDate(${item.id}, this.value)" placeholder="1945-2023">
+                <input type="text" id="date-${index}" value="${item.date}" onkeyup="updateCanvasDate(${index}, this.value)" placeholder="1945-2023">
             </div>
             
             <div class="checkbox-wrapper">
-                <input type="checkbox" id="welcome-${item.id}" onchange="updateWelcomeHome(${item.id}, this.checked)">
-                <label for="welcome-${item.id}" data-translate="welcomeHome">${translations[currentLang].welcomeHome}</label>
+                <input type="checkbox" id="welcome-${index}" ${item.welcomeHome ? 'checked' : ''} onchange="updateWelcomeHome(${index}, this.checked)">
+                <label for="welcome-${index}" data-translate="welcomeHome">${translations[currentLang].welcomeHome}</label>
             </div>
         </div>
     `;
 }
 
-// Add preview canvas
-function addPreviewCanvas(index) {
-    const slidesContainer = document.getElementById('previewSlides');
-    const slide = document.createElement('div');
-    slide.className = 'preview-slide';
-    slide.innerHTML = `<canvas id="preview-canvas-${index}" width="400" height="500"></canvas>`;
-    slidesContainer.appendChild(slide);
+// Switch canvas
+function switchCanvas(index) {
+    currentCanvasIndex = index;
     
-    // Draw initial preview
-    drawPreview(index);
-}
-
-// Remove canvas
-function removeCanvas(id) {
-    const index = canvasItems.findIndex(item => item.id === id);
-    if (index > -1 && canvasItems.length > 1) {
-        canvasItems.splice(index, 1);
-        
-        // Remove from DOM
-        document.querySelector(`[data-canvas-id="${id}"]`).remove();
-        document.getElementById('previewSlides').children[index].remove();
-        
-        // Re-index remaining items
-        canvasItems.forEach((item, i) => {
-            item.index = i;
-        });
-        
-        // Update canvas numbers
-        updateCanvasNumbers();
-        
-        // Update preview
-        if (currentPreviewIndex >= canvasItems.length) {
-            currentPreviewIndex = canvasItems.length - 1;
-        }
-        updatePreviewCarousel();
-        updatePricing();
-    }
-}
-
-// Update canvas numbers
-function updateCanvasNumbers() {
-    document.querySelectorAll('.canvas-item').forEach((element, index) => {
-        const title = element.querySelector('.canvas-item-title');
-        title.innerHTML = `<span data-translate="canvasNumber">${translations[currentLang].canvasNumber}</span> ${index + 1}`;
+    // Update tabs
+    document.querySelectorAll('.canvas-tabs .tab').forEach((tab, i) => {
+        tab.classList.toggle('active', i === index);
     });
+    
+    // Update canvas items
+    document.querySelectorAll('.canvas-item').forEach((item, i) => {
+        item.classList.toggle('active', i === index);
+    });
+    
+    // Update preview
+    drawPreview();
 }
 
 // Update canvas size
-function updateCanvasSize(id, size) {
-    const item = canvasItems.find(i => i.id === id);
-    if (item) {
-        item.size = size;
-        item.price = PRICES[size];
-        updatePricing();
-        drawPreview(item.index);
+function updateCanvasSize(index, size) {
+    canvasItems[index].size = size;
+    canvasItems[index].price = PRICES[size];
+    updatePricing();
+    if (index === currentCanvasIndex) {
+        drawPreview();
     }
 }
 
 // Handle photo upload
-function handlePhotoUpload(id, input) {
+function handlePhotoUpload(index, input) {
     if (input.files && input.files[0]) {
-        const item = canvasItems.find(i => i.id === id);
-        if (item) {
-            item.imageFile = input.files[0];
-            currentCropIndex = item.index;
-            
-            // Update label
-            document.getElementById(`photo-label-${id}`).textContent = input.files[0].name;
-            
-            // Open crop modal
-            openCropModal(input.files[0]);
-        }
+        canvasItems[index].imageFile = input.files[0];
+        currentCropCanvasId = index;
+        
+        // Update label
+        document.getElementById(`photo-label-${index}`).textContent = input.files[0].name;
+        
+        // Open crop modal
+        openCropModal(input.files[0]);
     }
 }
 
@@ -277,70 +326,66 @@ function cancelCrop() {
         cropper = null;
     }
     document.getElementById('cropModal').style.display = 'none';
-    currentCropIndex = null;
+    currentCropCanvasId = null;
 }
 
 // Apply crop
 function applyCrop() {
-    if (cropper && currentCropIndex !== null) {
+    if (cropper && currentCropCanvasId !== null) {
         const canvas = cropper.getCroppedCanvas({
             width: 800,
             height: 800
         });
         
         canvas.toBlob(function(blob) {
-            const item = canvasItems[currentCropIndex];
-            item.croppedImage = blob;
+            canvasItems[currentCropCanvasId].croppedImage = blob;
             
             // Create object URL for preview
-            if (item.croppedImageUrl) {
-                URL.revokeObjectURL(item.croppedImageUrl);
+            if (canvasItems[currentCropCanvasId].croppedImageUrl) {
+                URL.revokeObjectURL(canvasItems[currentCropCanvasId].croppedImageUrl);
             }
-            item.croppedImageUrl = URL.createObjectURL(blob);
+            canvasItems[currentCropCanvasId].croppedImageUrl = URL.createObjectURL(blob);
             
             // Close modal
             cancelCrop();
             
-            // Update preview
-            drawPreview(currentCropIndex);
+            // Update preview if current canvas
+            if (currentCropCanvasId === currentCanvasIndex) {
+                drawPreview();
+            }
         });
     }
 }
 
 // Update canvas text
-function updateCanvasText(id, text) {
-    const item = canvasItems.find(i => i.id === id);
-    if (item) {
-        item.text = text;
-        drawPreview(item.index);
+function updateCanvasText(index, text) {
+    canvasItems[index].text = text;
+    if (index === currentCanvasIndex) {
+        drawPreview();
     }
 }
 
 // Update canvas date
-function updateCanvasDate(id, date) {
-    const item = canvasItems.find(i => i.id === id);
-    if (item) {
-        item.date = date;
-        drawPreview(item.index);
+function updateCanvasDate(index, date) {
+    canvasItems[index].date = date;
+    if (index === currentCanvasIndex) {
+        drawPreview();
     }
 }
 
 // Update welcome home
-function updateWelcomeHome(id, checked) {
-    const item = canvasItems.find(i => i.id === id);
-    if (item) {
-        item.welcomeHome = checked;
-        drawPreview(item.index);
+function updateWelcomeHome(index, checked) {
+    canvasItems[index].welcomeHome = checked;
+    if (index === currentCanvasIndex) {
+        drawPreview();
     }
 }
 
 // Draw preview
-function drawPreview(index) {
-    const canvas = document.getElementById(`preview-canvas-${index}`);
-    if (!canvas) return;
-    
+function drawPreview() {
+    const canvas = document.getElementById('previewCanvas');
     const ctx = canvas.getContext('2d');
-    const item = canvasItems[index];
+    const item = canvasItems[currentCanvasIndex];
     
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -391,30 +436,6 @@ function drawPreview(index) {
     }
 }
 
-// Update preview carousel
-function updatePreviewCarousel() {
-    const slides = document.getElementById('previewSlides');
-    const offset = -currentPreviewIndex * 100;
-    slides.style.transform = `translateX(${offset}%)`;
-    
-    // Update indicator
-    const indicator = document.getElementById('previewIndicator');
-    indicator.textContent = `Canvas ${currentPreviewIndex + 1} of ${canvasItems.length}`;
-    
-    // Show/hide navigation buttons
-    document.querySelector('.carousel-btn.prev').style.display = 
-        currentPreviewIndex > 0 ? 'flex' : 'none';
-    document.querySelector('.carousel-btn.next').style.display = 
-        currentPreviewIndex < canvasItems.length - 1 ? 'flex' : 'none';
-}
-
-// Change preview
-function changePreview(direction) {
-    currentPreviewIndex += direction;
-    currentPreviewIndex = Math.max(0, Math.min(currentPreviewIndex, canvasItems.length - 1));
-    updatePreviewCarousel();
-}
-
 // Update pricing
 function updatePricing() {
     let subtotal = 0;
@@ -423,28 +444,16 @@ function updatePricing() {
     });
     
     let discount = 0;
-    let discountText = '';
-    
     if (canvasItems.length >= 5) {
         discount = subtotal * 0.12;
-        discountText = `12% ${translations[currentLang].discount} (5+ canvas)`;
     } else if (canvasItems.length >= 3) {
         discount = subtotal * 0.05;
-        discountText = `5% ${translations[currentLang].discount} (3+ canvas)`;
     }
     
     const total = subtotal - discount;
     
     // Update display
-    document.querySelector('.price-amount').textContent = `$${total.toFixed(2)}`;
-    
-    const discountInfo = document.querySelector('.discount-info');
-    if (discount > 0) {
-        discountInfo.style.display = 'block';
-        discountInfo.querySelector('.discount-text').textContent = discountText;
-    } else {
-        discountInfo.style.display = 'none';
-    }
+    document.querySelector('.total-price').textContent = `$${total.toFixed(2)}`;
 }
 
 // Confirm order
@@ -457,17 +466,21 @@ function confirmOrder() {
     }
     
     // Validate each canvas
-    for (let item of canvasItems) {
+    for (let i = 0; i < canvasItems.length; i++) {
+        const item = canvasItems[i];
         if (!item.size) {
-            alert(`Canvas ${item.index + 1}: ${translations[currentLang].selectSize}`);
+            alert(`${translations[currentLang].canvasNumber} ${i + 1}: ${translations[currentLang].selectSize}`);
+            switchCanvas(i);
             return;
         }
         if (!item.imageFile) {
-            alert(`Canvas ${item.index + 1}: ${translations[currentLang].uploadPhoto}`);
+            alert(`${translations[currentLang].canvasNumber} ${i + 1}: ${translations[currentLang].uploadPhoto}`);
+            switchCanvas(i);
             return;
         }
         if (!item.text) {
-            alert(`Canvas ${item.index + 1}: ${translations[currentLang].enterText}`);
+            alert(`${translations[currentLang].canvasNumber} ${i + 1}: ${translations[currentLang].enterText}`);
+            switchCanvas(i);
             return;
         }
     }
@@ -481,39 +494,21 @@ function showConfirmModal() {
     const modal = document.getElementById('confirmModal');
     const summary = document.getElementById('orderSummary');
     
-    let summaryHtml = `<h4>${translations[currentLang].orderSummaryTitle}</h4>`;
-    let subtotal = 0;
+    let summaryHtml = '';
     
     canvasItems.forEach((item, index) => {
         summaryHtml += `
-            <div class="order-summary-item">
-                <strong>Canvas ${index + 1}</strong><br>
-                Size: ${item.size} - $${item.price}<br>
-                Text: ${item.text}<br>
-                Date: ${item.date || 'N/A'}<br>
-                Welcome Home: ${item.welcomeHome ? 'Yes' : 'No'}
+            <div class="order-item">
+                <h4>${translations[currentLang].canvasNumber} ${index + 1}</h4>
+                <div class="order-item-details">
+                    <span><strong>Size:</strong> ${item.size} - $${item.price}</span>
+                    <span><strong>Text:</strong> ${item.text}</span>
+                    <span><strong>Date:</strong> ${item.date || '-'}</span>
+                    <span><strong>Welcome Home:</strong> ${item.welcomeHome ? 'Yes' : 'No'}</span>
+                </div>
             </div>
         `;
-        subtotal += item.price;
     });
-    
-    // Calculate discount
-    let discount = 0;
-    if (canvasItems.length >= 5) {
-        discount = subtotal * 0.12;
-    } else if (canvasItems.length >= 3) {
-        discount = subtotal * 0.05;
-    }
-    
-    const total = subtotal - discount;
-    
-    summaryHtml += `
-        <div class="order-summary-total">
-            Subtotal: $${subtotal.toFixed(2)}<br>
-            ${discount > 0 ? `Discount: -$${discount.toFixed(2)}<br>` : ''}
-            <strong>Total: $${total.toFixed(2)}</strong>
-        </div>
-    `;
     
     summary.innerHTML = summaryHtml;
     modal.style.display = 'flex';
@@ -536,6 +531,7 @@ async function submitOrder() {
         formData.append('notes', document.getElementById('notes').value);
         formData.append('language', currentLang);
         formData.append('timestamp', new Date().toISOString());
+        formData.append('order_type', isMultiCanvas ? 'multi' : 'single');
         
         // Add canvas data
         formData.append('canvasCount', canvasItems.length);
@@ -569,7 +565,7 @@ async function submitOrder() {
         });
         
         // TODO: Replace with your actual webhook URL
-         const response = await fetch('https://script.google.com/macros/s/AKfycbyUAX6Fikn14ExNC_uzNojc6gFvKZAbSYaS3rxEVyyeen0Kb_ahf-hdRvjsxj9QJyHR/exec', {
+        // const response = await fetch('YOUR_WEBHOOK_URL', {
         //     method: 'POST',
         //     body: formData
         // });
@@ -577,15 +573,23 @@ async function submitOrder() {
         // For demo, just log the data
         console.log('Order data prepared:', formData);
         
-        // Show success message
-        alert(translations[currentLang].thankYou);
-        
-        // Close modal and reset form
+        // Show thank you page
         closeConfirmModal();
-        // window.location.reload(); // Uncomment to reset form after submission
+        showThankYouPage();
         
     } catch (error) {
         console.error('Error submitting order:', error);
         alert(translations[currentLang].errorSubmit);
     }
+}
+
+// Show thank you page
+function showThankYouPage() {
+    document.getElementById('thankYouPage').style.display = 'flex';
+    document.querySelector('.container').style.display = 'none';
+}
+
+// Start new order
+function startNewOrder() {
+    window.location.reload();
 }
