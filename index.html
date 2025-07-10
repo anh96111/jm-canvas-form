@@ -28,8 +28,8 @@
             <div class="form-section">
                 <h2 data-translate="customerInfo">Customer Information</h2>
                 <div class="form-group">
-                    <label data-translate="fbName">Your Facebook name *</label>
-                    <input type="text" id="fbName" placeholder="Enter your Facebook name" required>
+                    <label data-translate="fbName">Your Facebook name</label>
+                    <input type="text" id="fbName" placeholder="Enter your Facebook name">
                 </div>
                 <div class="form-group">
                     <label data-translate="email">Email *</label>
@@ -77,6 +77,17 @@
                 <!-- Canvas Items Container -->
                 <div id="canvasItemsContainer" class="canvas-items-container">
                     <!-- Canvas items will be dynamically added here -->
+                </div>
+            </div>
+
+            <!-- Preview Section -->
+            <div class="preview-section">
+                <h2 data-translate="preview">Canvas Preview</h2>
+                <div class="preview-container">
+                    <canvas id="previewCanvas" width="400" height="500"></canvas>
+                    <div class="preview-notice" data-translate="previewNotice">
+                        This is only a preview for your custom text. The final canvas preview will be sent to your email and Messenger.
+                    </div>
                 </div>
             </div>
 
