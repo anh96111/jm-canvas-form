@@ -4,95 +4,108 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>JM-Canvas Order Form</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="container">
-        <!-- Header with Logo -->
+        <!-- Header with Logo and Price Summary -->
         <header class="header">
             <img src="logo.png" alt="JM-Canvas" class="logo">
             <h1>JM-Canvas Order Form</h1>
-            <div class="language-switch">
-                <button class="lang-btn active" data-lang="en">EN</button>
-                <button class="lang-btn" data-lang="es">ES</button>
+            <div class="price-summary">
+                <div class="total-price">
+                    <span data-translate="total">Total</span>: 
+                    <span class="price-amount">$0</span>
+                </div>
+                <div class="discount-info" style="display: none;">
+                    <span class="discount-text"></span>
+                </div>
             </div>
         </header>
 
         <!-- Form Container -->
         <div class="form-container">
-            <!-- Customer Info (Auto-filled) -->
+            <!-- Customer Info -->
             <div class="form-section">
                 <h2 data-translate="customerInfo">Customer Information</h2>
                 <div class="form-group">
-                    <label data-translate="fbName">Facebook Name</label>
-                    <input type="text" id="fbName" readonly>
+                    <label data-translate="fbName">Your Facebook name</label>
+                    <input type="text" id="fbName" placeholder="Enter your Facebook name">
                 </div>
                 <div class="form-group">
                     <label data-translate="email">Email *</label>
-                    <input type="email" id="email" required>
+                    <input type="email" id="email" required placeholder="your@email.com">
                 </div>
             </div>
 
-            <!-- Canvas Size Selection -->
-            <div class="form-section">
-                <h2 data-translate="selectSize">Select Canvas Size</h2>
-                <div class="size-buttons">
-                    <button class="size-btn" data-size="8x10" data-price="34">
-                        8x10<br><span class="price">$34</span>
-                    </button>
-                    <button class="size-btn" data-size="11x14" data-price="43">
-                        11x14<br><span class="price">$43</span>
-                    </button>
-                    <button class="size-btn" data-size="16x20" data-price="62">
-                        16x20<br><span class="price">$62</span>
-                    </button>
-                    <button class="size-btn" data-size="20x30" data-price="82">
-                        20x30<br><span class="price">$82</span>
-                    </button>
-                </div>
+            <!-- Canvas Items Container -->
+            <div class="canvas-items-container">
+                <!-- Canvas items will be dynamically added here -->
             </div>
 
-            <!-- Canvas Preview Section -->
-            <div class="form-section preview-section" style="display: none;">
+            <!-- Add Canvas Button -->
+            <button class="add-canvas-btn" onclick="addNewCanvas()">
+                <span class="plus-icon">+</span>
+                <span data-translate="addCanvas">Add Another Canvas</span>
+            </button>
+
+            <!-- Preview Section -->
+            <div class="preview-section">
                 <h2 data-translate="preview">Canvas Preview</h2>
-                <div class="preview-container">
-                    <canvas id="previewCanvas" width="400" height="500"></canvas>
-                    <div class="preview-controls">
-                        <div class="form-group">
-                            <label data-translate="uploadPhoto">Upload Photo *</label>
-                            <input type="file" id="photoUpload" accept="image/*" required>
-                        </div>
-                        <div class="form-group">
-                            <label data-translate="enterText">Enter Your Text *</label>
-                            <input type="text" id="customText" placeholder="Enter name or dedication">
-                        </div>
-                        <div class="form-group">
-                            <label data-translate="enterDate">Date</label>
-                            <input type="text" id="customDate" placeholder="1945-2023">
+                <div class="preview-carousel-container">
+                    <button class="carousel-btn prev" onclick="changePreview(-1)">‹</button>
+                    <div class="preview-carousel">
+                        <div class="preview-slides" id="previewSlides">
+                            <!-- Preview canvases will be added here -->
                         </div>
                     </div>
+                    <button class="carousel-btn next" onclick="changePreview(1)">›</button>
                 </div>
+                <div class="preview-indicator" id="previewIndicator"></div>
             </div>
 
-            <!-- Additional Options -->
+            <!-- Notes Section -->
             <div class="form-section">
                 <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="welcomeHome">
-                        <span data-translate="welcomeHome">Add "Welcome Home" text</span>
-                    </label>
-                </div>
-                <div class="form-group">
                     <label data-translate="notes">Additional Notes</label>
-                    <textarea id="notes" rows="3"></textarea>
+                    <textarea id="notes" rows="3" placeholder="Special instructions..."></textarea>
                 </div>
             </div>
 
             <!-- Submit Button -->
-            <button class="submit-btn" data-translate="submit">Submit Order</button>
+            <button class="submit-btn" onclick="confirmOrder()" data-translate="submit">Submit Order</button>
         </div>
     </div>
 
+    <!-- Crop Modal -->
+    <div id="cropModal" class="modal">
+        <div class="modal-content">
+            <h3 data-translate="cropImage">Crop Your Image</h3>
+            <div class="crop-container">
+                <img id="cropImage" style="max-width: 100%;">
+            </div>
+            <div class="crop-buttons">
+                <button onclick="cancelCrop()" data-translate="cancel">Cancel</button>
+                <button onclick="applyCrop()" class="primary-btn" data-translate="apply">Apply Crop</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmModal" class="modal">
+        <div class="modal-content confirm-content">
+            <h3 data-translate="confirmOrder">Confirm Your Order</h3>
+            <div id="orderSummary"></div>
+            <div class="confirm-buttons">
+                <button onclick="closeConfirmModal()" data-translate="edit">Edit Order</button>
+                <button onclick="submitOrder()" class="primary-btn" data-translate="confirmSubmit">Confirm & Submit</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="translations.js"></script>
     <script src="script.js"></script>
 </body>
 </html>
