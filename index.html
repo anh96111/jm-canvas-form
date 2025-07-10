@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JM-Canvas Order Form</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header with Logo -->
+        <header class="header">
+            <img src="logo.png" alt="JM-Canvas" class="logo">
+            <h1>JM-Canvas Order Form</h1>
+            <div class="language-switch">
+                <button class="lang-btn active" data-lang="en">EN</button>
+                <button class="lang-btn" data-lang="es">ES</button>
+            </div>
+        </header>
+
+        <!-- Form Container -->
+        <div class="form-container">
+            <!-- Customer Info (Auto-filled) -->
+            <div class="form-section">
+                <h2 data-translate="customerInfo">Customer Information</h2>
+                <div class="form-group">
+                    <label data-translate="fbName">Facebook Name</label>
+                    <input type="text" id="fbName" readonly>
+                </div>
+                <div class="form-group">
+                    <label data-translate="email">Email *</label>
+                    <input type="email" id="email" required>
+                </div>
+            </div>
+
+            <!-- Canvas Size Selection -->
+            <div class="form-section">
+                <h2 data-translate="selectSize">Select Canvas Size</h2>
+                <div class="size-buttons">
+                    <button class="size-btn" data-size="8x10" data-price="34">
+                        8x10<br><span class="price">$34</span>
+                    </button>
+                    <button class="size-btn" data-size="11x14" data-price="43">
+                        11x14<br><span class="price">$43</span>
+                    </button>
+                    <button class="size-btn" data-size="16x20" data-price="62">
+                        16x20<br><span class="price">$62</span>
+                    </button>
+                    <button class="size-btn" data-size="20x30" data-price="82">
+                        20x30<br><span class="price">$82</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Canvas Preview Section -->
+            <div class="form-section preview-section" style="display: none;">
+                <h2 data-translate="preview">Canvas Preview</h2>
+                <div class="preview-container">
+                    <canvas id="previewCanvas" width="400" height="500"></canvas>
+                    <div class="preview-controls">
+                        <div class="form-group">
+                            <label data-translate="uploadPhoto">Upload Photo *</label>
+                            <input type="file" id="photoUpload" accept="image/*" required>
+                        </div>
+                        <div class="form-group">
+                            <label data-translate="enterText">Enter Your Text *</label>
+                            <input type="text" id="customText" placeholder="Enter name or dedication">
+                        </div>
+                        <div class="form-group">
+                            <label data-translate="enterDate">Date</label>
+                            <input type="text" id="customDate" placeholder="1945-2023">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Additional Options -->
+            <div class="form-section">
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="welcomeHome">
+                        <span data-translate="welcomeHome">Add "Welcome Home" text</span>
+                    </label>
+                </div>
+                <div class="form-group">
+                    <label data-translate="notes">Additional Notes</label>
+                    <textarea id="notes" rows="3"></textarea>
+                </div>
+            </div>
+
+            <!-- Submit Button -->
+            <button class="submit-btn" data-translate="submit">Submit Order</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
