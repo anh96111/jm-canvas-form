@@ -23,17 +23,6 @@ body {
     line-height: 1.6;
     color: #333;
     background-color: #f5f5f5;
-    font-size: 16px;
-    font-weight: 500; /* Slightly bolder for 35-65+ */
-}
-
-/* Prevent zoom on input focus for mobile */
-input[type="text"],
-input[type="email"],
-input[type="tel"],
-select,
-textarea {
-    font-size: 16px; /* Prevent iOS zoom */
 }
 
 /* Container */
@@ -43,146 +32,70 @@ textarea {
     padding: 0 20px;
 }
 
-/* Header - Compact for better space usage */
+/* Header */
 .header {
     text-align: center;
-    padding: 1rem 0; /* Reduced from 2rem */
+    padding: 2rem 0;
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
-    margin-bottom: 1.5rem;
+    margin-bottom: 2rem;
     position: relative;
 }
 
 .logo {
-    width: 60px; /* Reduced from 80px */
-    height: 60px; /* Reduced from 80px */
-    border-radius: 50%;
-    margin-bottom: 0.5rem; /* Reduced from 1rem */
-    object-fit: cover;
+    height: 80px;      /* Giảm chiều cao logo, có thể chỉnh nhỏ hơn nếu muốn */
+    width: auto;
 }
 
 .header h1 {
-    font-size: 1.8rem; /* Reduced from 2.5rem */
-    font-weight: 700;
-    margin: 0;
+    font-size: 1.0rem; /* Giảm cỡ chữ thương hiệu */
+    margin-left: 12px; /* Khoảng cách với logo */
 }
 
-/* Promotional Banner - Scrolling Text Animation */
+/* Promotional Banner - 35s Animation */
 .promo-banner {
     background: linear-gradient(90deg, #ff6b6b, #feca57, #48dbfb, #ff9ff3);
     background-size: 400% 400%;
-    animation: gradientMove 10s ease-in-out infinite;
-    padding: 0.75rem; /* Optimized for 35-65+ */
-    margin-bottom: 1.5rem;
+    animation: gradientMove 35s ease-in-out infinite;
+    padding: 1rem;
+    margin-bottom: 2rem;
     border-radius: 10px;
     overflow: hidden;
     position: relative;
-    height: 60px; /* Fixed height */
-    display: flex;
-    align-items: center;
 }
 
 @keyframes gradientMove {
     0% { background-position: 0% 50%; }
+    25% { background-position: 50% 50%; }
     50% { background-position: 100% 50%; }
+    75% { background-position: 50% 50%; }
     100% { background-position: 0% 50%; }
 }
 
 .promo-text {
-    color: white;
-    font-weight: 600;
-    font-size: 1.2rem; /* Increased for better readability */
-    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    display: inline-block;
     white-space: nowrap;
-    animation: scrollText 35s linear infinite;
-    line-height: 1.4;
+    animation: marquee 18s linear infinite;
+    min-width: 100%;
+    font-size: 1.1rem;
 }
 
-@keyframes scrollText {
-    0% { transform: translateX(100%); }
+@keyframes marquee {
+    0%   { transform: translateX(100%); }
     100% { transform: translateX(-100%); }
 }
 
-/* Progress Indicators */
-.progress-container {
-    margin-bottom: 2rem;
-    padding: 1rem;
-    background: white;
-    border-radius: 10px;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-}
-
-.progress-steps {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    position: relative;
-    margin-bottom: 0.5rem;
-}
-
-.progress-step {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    flex: 1;
-    position: relative;
-}
-
-.step-circle {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: #e0e0e0;
-    color: #666;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 0.5rem;
-    transition: all 0.3s ease;
-}
-
-.step-circle.active {
-    background: #667eea;
-    color: white;
-}
-
-.step-circle.completed {
-    background: #27ae60;
-    color: white;
-}
-
-.step-label {
-    font-size: 12px;
-    color: #666;
+.promo-text {
     text-align: center;
-    font-weight: 500;
-}
-
-.step-label.active {
-    color: #667eea;
+    color: white;
     font-weight: 600;
+    font-size: 1.1rem;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    display: block;
+    width: 100%;
 }
 
-.progress-line {
-    position: absolute;
-    top: 20px;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: #e0e0e0;
-    z-index: 1;
-}
-
-.progress-line-fill {
-    height: 100%;
-    background: #667eea;
-    transition: width 0.3s ease;
-    width: 0%;
-}
-
-/* Main Content Layout */
+/* Main Content Layout - 2 Column */
 .main-content {
     display: flex;
     gap: 2rem;
@@ -203,7 +116,10 @@ textarea {
     padding: 2rem;
     border-radius: 15px;
     box-shadow: 0 10px 30px rgba(0,0,0,0.1);
-    /* Removed sticky positioning */
+    position: sticky;
+    top: 2rem;
+    max-height: calc(100vh - 4rem);
+    overflow-y: auto;
 }
 
 /* Section Header with FAQ Button */
@@ -212,29 +128,25 @@ textarea {
     justify-content: space-between;
     align-items: center;
     margin-bottom: 1rem;
-    flex-wrap: wrap;
-    gap: 1rem;
 }
 
 .section-header h2 {
     margin: 0;
     color: #2c3e50;
     font-size: 1.5rem;
-    font-weight: 600;
 }
 
 .faq-button {
     background: #3498db;
     color: white;
     border: none;
-    padding: 0.75rem 1.5rem; /* Increased for better touch target */
-    border-radius: 25px;
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
     cursor: pointer;
-    font-size: 1rem;
+    font-size: 0.9rem;
     font-weight: 600;
     transition: all 0.3s ease;
     box-shadow: 0 2px 10px rgba(52, 152, 219, 0.3);
-    min-height: 44px; /* Accessibility requirement */
 }
 
 .faq-button:hover {
@@ -269,21 +181,18 @@ textarea {
     display: block;
     margin-bottom: 0.5rem;
     color: #555;
-    font-weight: 600; /* Bolder for better readability */
-    font-size: 1rem;
+    font-weight: 500;
 }
 
 .form-group input,
 .form-group select,
 .form-group textarea {
     width: 100%;
-    padding: 1rem; /* Increased for better touch targets */
+    padding: 0.75rem;
     border: 2px solid #ddd;
     border-radius: 8px;
     font-size: 1rem;
     transition: border-color 0.3s ease;
-    min-height: 44px; /* Accessibility requirement */
-    font-weight: 500;
 }
 
 .form-group input:focus,
@@ -294,47 +203,31 @@ textarea {
     box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
 }
 
-/* Enhanced Dropdown Styling */
-.form-group select {
-    padding: 1rem 1.5rem; /* Extra padding for mobile */
-    font-size: 1.1rem; /* Larger font for better readability */
-    font-weight: 600;
-    background: white;
-    cursor: pointer;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='m6 8 4 4 4-4'/%3e%3c/svg%3e");
-    background-position: right 1rem center;
-    background-repeat: no-repeat;
-    background-size: 1.5em 1.5em;
-    padding-right: 3rem;
-}
-
-/* Size Grid - 3+1 Layout */
+/* Size Grid (2x2) - Chính xác giá */
 .size-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 1rem;
+    display: flex;
+    gap: 0.5rem;
     margin-bottom: 1rem;
-}
-
-.size-grid .size-option:nth-child(4) {
-    grid-column: 2; /* Center the 4th item */
+    flex-wrap: wrap;
+    justify-content: flex-start;
 }
 
 .size-option {
     border: 2px solid #ddd;
-    border-radius: 12px;
-    padding: 1.25rem;
+    border-radius: 8px;
+    padding: 0.3rem 0.7rem;    /* Giảm padding */
     text-align: center;
     cursor: pointer;
     transition: all 0.3s ease;
     background: white;
     position: relative;
-    min-height: 120px;
+    font-size: 0.85rem;        /* Nhỏ chữ hơn */
+    min-width: 70px;           /* Nhỏ lại chiều ngang */
+    min-height: 36px;          /* Giảm chiều cao */
     display: flex;
     flex-direction: column;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
 }
 
 .size-option:hover {
@@ -350,14 +243,14 @@ textarea {
 }
 
 .size-label {
-    font-size: 1.1rem;
+    font-size: 1.2rem;
     font-weight: 600;
     color: #2c3e50;
     margin-bottom: 0.5rem;
 }
 
 .size-price {
-    font-size: 1.3rem;
+    font-size: 1.4rem;
     font-weight: 700;
     color: #27ae60;
 }
@@ -378,23 +271,19 @@ textarea {
 .checkbox-wrapper {
     display: flex;
     align-items: center;
-    gap: 0.75rem;
+    gap: 0.5rem;
     margin-bottom: 1rem;
 }
 
 .checkbox-wrapper input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
+    width: auto;
     margin: 0;
-    cursor: pointer;
 }
 
 .checkbox-wrapper label {
     margin: 0;
     cursor: pointer;
     user-select: none;
-    font-size: 1rem;
-    font-weight: 600;
 }
 
 /* Upload Container */
@@ -414,11 +303,6 @@ textarea {
 .upload-area {
     cursor: pointer;
     padding: 1rem;
-    min-height: 44px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
 }
 
 .upload-icon {
@@ -472,16 +356,14 @@ textarea {
     color: white;
     border: none;
     border-radius: 50%;
-    width: 24px;
-    height: 24px;
+    width: 20px;
+    height: 20px;
     cursor: pointer;
-    font-size: 14px;
+    font-size: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
     font-weight: bold;
-    min-height: 44px;
-    min-width: 44px;
 }
 
 .image-thumbnail .delete-btn:hover {
@@ -494,7 +376,6 @@ textarea {
     gap: 0.5rem;
     margin-bottom: 1rem;
     border-bottom: 2px solid #eee;
-    flex-wrap: wrap;
 }
 
 .tab {
@@ -505,16 +386,13 @@ textarea {
     border-radius: 8px 8px 0 0;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-weight: 600;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
 }
 
 .tab.active {
     background: white;
     border-color: #3498db;
     color: #3498db;
+    font-weight: 600;
 }
 
 .tab:hover:not(.active) {
@@ -558,7 +436,12 @@ textarea {
     font-size: 0.9rem;
     color: #666;
     text-align: center;
-    font-weight: 500;
+}
+
+/* Collage Mode Preview - 500x400px */
+.preview-section.collage-mode #previewCanvas {
+    width: 500px;
+    height: 400px;
 }
 
 /* Price Summary */
@@ -585,14 +468,13 @@ textarea {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     color: white;
     border: none;
-    padding: 1.25rem 2rem; /* Increased for better touch target */
+    padding: 1rem 2rem;
     border-radius: 12px;
-    font-size: 1.2rem;
+    font-size: 1.1rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
     box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
-    min-height: 56px; /* Large touch target */
 }
 
 .submit-btn:hover {
@@ -612,18 +494,13 @@ textarea {
     font-size: 0.9rem;
     margin-top: 0.5rem;
     display: none;
-    font-weight: 600;
-    padding: 0.5rem;
-    background: #ffeaea;
-    border-radius: 4px;
-    border-left: 4px solid #e74c3c;
 }
 
 .validation-error.show {
     display: block;
 }
 
-/* Modal Base */
+/* FAQ Modal */
 .modal {
     display: none;
     position: fixed;
@@ -647,7 +524,6 @@ textarea {
     box-shadow: 0 20px 60px rgba(0,0,0,0.3);
 }
 
-/* FAQ Modal */
 .faq-content {
     max-width: 700px;
 }
@@ -674,11 +550,6 @@ textarea {
     font-weight: bold;
     cursor: pointer;
     line-height: 1;
-    min-width: 44px;
-    min-height: 44px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
 }
 
 .close:hover {
@@ -704,7 +575,6 @@ textarea {
     justify-content: space-between;
     align-items: center;
     transition: background 0.3s ease;
-    min-height: 44px;
 }
 
 .faq-question:hover {
@@ -757,7 +627,6 @@ textarea {
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    min-height: 44px;
 }
 
 .primary-btn:hover {
@@ -765,26 +634,17 @@ textarea {
     transform: translateY(-2px);
 }
 
-/* Crop Modal with Fixed Buttons */
+/* Crop Modal */
 .crop-container {
     padding: 2rem;
     text-align: center;
-    max-height: 60vh;
-    overflow-y: auto;
 }
 
 .crop-buttons {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
     display: flex;
     gap: 1rem;
-    z-index: 1001;
-    background: white;
-    padding: 1rem;
-    border-radius: 10px;
-    box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+    justify-content: center;
+    padding: 1rem 2rem 2rem;
 }
 
 .crop-buttons button {
@@ -794,8 +654,6 @@ textarea {
     cursor: pointer;
     font-size: 1rem;
     transition: all 0.3s ease;
-    min-height: 44px;
-    font-weight: 600;
 }
 
 .crop-buttons button:first-child {
@@ -827,8 +685,6 @@ textarea {
     cursor: pointer;
     font-size: 1rem;
     transition: all 0.3s ease;
-    min-height: 44px;
-    font-weight: 600;
 }
 
 .confirm-buttons button:first-child {
@@ -840,14 +696,14 @@ textarea {
     background: #5a6268;
 }
 
-/* Thank You Page - Full Screen */
+/* Thank You Page */
 .thank-you-page {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: rgba(0,0,0,0.8);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -861,25 +717,11 @@ textarea {
     text-align: center;
     max-width: 500px;
     box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    margin: 2rem;
 }
 
 .thank-you-icon {
-    font-size: 6rem; /* Larger emoji */
+    font-size: 4rem;
     margin-bottom: 1rem;
-    animation: bounce 2s infinite;
-}
-
-@keyframes bounce {
-    0%, 20%, 50%, 80%, 100% {
-        transform: translateY(0);
-    }
-    40% {
-        transform: translateY(-10px);
-    }
-    60% {
-        transform: translateY(-5px);
-    }
 }
 
 .thank-you-content h2 {
@@ -892,18 +734,33 @@ textarea {
     color: #666;
     margin-bottom: 2rem;
     line-height: 1.6;
-    font-size: 1.1rem;
 }
 
 /* Mobile Responsive */
 @media (max-width: 768px) {
-    .container {
-        padding: 0 15px;
-    }
-    
     .main-content {
         flex-direction: column;
-        gap: 1rem;
+    }
+    
+    .preview-section {
+        flex: none;
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        margin-bottom: 2rem;
+    }
+    
+    .size-grid {
+        grid-template-columns: 1fr;
+        gap: 0.5rem;
+    }
+    
+    .header h1 {
+        font-size: 2rem;
+    }
+    
+    .container {
+        padding: 0 10px;
     }
     
     .form-container,
@@ -911,46 +768,14 @@ textarea {
         padding: 1.5rem;
     }
     
-    .preview-section {
-        flex: none;
-        order: -1; /* Move preview before form on mobile */
-        margin-bottom: 1rem;
-    }
-    
-    /* Mobile Preview - Smaller Size */
-    #previewCanvas {
-        width: 300px;
-        height: 375px;
-        max-width: 100%;
-    }
-    
-    .size-grid {
-        grid-template-columns: 1fr;
-        gap: 0.75rem;
-    }
-    
-    .size-grid .size-option:nth-child(4) {
-        grid-column: 1;
-    }
-    
-    .size-option {
-        padding: 1rem;
-        min-height: 100px;
-    }
-    
-    .header h1 {
-        font-size: 1.5rem;
-    }
-    
     .section-header {
         flex-direction: column;
+        gap: 1rem;
         align-items: flex-start;
     }
     
     .faq-button {
         align-self: flex-end;
-        padding: 0.5rem 1rem;
-        font-size: 0.9rem;
     }
     
     .image-thumbnails {
@@ -965,58 +790,11 @@ textarea {
     .promo-text {
         font-size: 1rem;
     }
-    
-    .canvas-tabs {
-        overflow-x: auto;
-    }
-    
-    .tab {
-        flex-shrink: 0;
-        padding: 0.5rem 1rem;
-    }
-    
-    .progress-steps {
-        flex-wrap: wrap;
-        gap: 0.5rem;
-    }
-    
-    .step-circle {
-        width: 35px;
-        height: 35px;
-        font-size: 12px;
-    }
-    
-    .step-label {
-        font-size: 10px;
-    }
-    
-    .thank-you-content {
-        padding: 2rem;
-        margin: 1rem;
-    }
-    
-    .thank-you-icon {
-        font-size: 4rem;
-    }
-    
-    .thank-you-content h2 {
-        font-size: 1.5rem;
-    }
-    
-    .crop-buttons {
-        position: fixed;
-        bottom: 10px;
-        left: 10px;
-        right: 10px;
-        transform: none;
-        justify-content: center;
-    }
 }
 
 @media (max-width: 480px) {
     .size-option {
-        padding: 0.75rem;
-        min-height: 80px;
+        padding: 1rem;
     }
     
     .size-label {
@@ -1024,7 +802,7 @@ textarea {
     }
     
     .size-price {
-        font-size: 1.1rem;
+        font-size: 1.2rem;
     }
     
     .upload-container {
@@ -1043,74 +821,35 @@ textarea {
         padding: 1rem;
     }
     
-    .form-group input,
-    .form-group select,
-    .form-group textarea {
-        padding: 0.75rem;
-    }
-    
-    .checkbox-wrapper {
-        gap: 0.5rem;
-    }
-    
-    .checkbox-wrapper input[type="checkbox"] {
-        width: 18px;
-        height: 18px;
+    .thank-you-content {
+        padding: 2rem;
+        margin: 1rem;
     }
 }
 
-/* High Contrast Mode for Accessibility */
-@media (prefers-contrast: high) {
-    .size-option {
-        border-width: 3px;
-    }
-    
-    .form-group input,
-    .form-group select,
-    .form-group textarea {
-        border-width: 3px;
-    }
-    
-    .validation-error {
-        border-left-width: 6px;
-    }
+/* Sticky Behavior States */
+.preview-section.sticky {
+    position: sticky;
+    top: 2rem;
 }
 
-/* Reduced Motion for Accessibility */
-@media (prefers-reduced-motion: reduce) {
-    * {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-    }
-    
-    .promo-text {
-        animation: none;
-    }
-    
-    .thank-you-icon {
-        animation: none;
-    }
+.preview-section.unsticky {
+    position: static;
 }
 
-/* Focus Styles for Keyboard Navigation */
-*:focus {
-    outline: 2px solid #3498db;
-    outline-offset: 2px;
+/* Canvas Item Visibility */
+.canvas-item {
+    display: block;
 }
 
-.size-option:focus,
-.tab:focus,
-.faq-question:focus {
-    outline: 2px solid #3498db;
-    outline-offset: 2px;
+.canvas-item.hidden {
+    display: none;
 }
 
 /* Loading States */
 .loading {
     opacity: 0.6;
     pointer-events: none;
-    position: relative;
 }
 
 .loading::after {
@@ -1129,50 +868,4 @@ textarea {
 
 @keyframes spin {
     to { transform: rotate(360deg); }
-}
-
-/* Canvas Item Visibility */
-.canvas-item {
-    display: block;
-}
-
-.canvas-item.hidden {
-    display: none;
-}
-
-/* Order Summary Styles */
-.order-summary {
-    font-size: 0.9rem;
-    line-height: 1.6;
-}
-
-.order-summary h4 {
-    color: #2c3e50;
-    margin: 1rem 0 0.5rem 0;
-    font-size: 1.1rem;
-}
-
-.order-summary h5 {
-    color: #3498db;
-    margin: 0.75rem 0 0.25rem 0;
-    font-size: 1rem;
-}
-
-.canvas-summary {
-    background: #f8f9fa;
-    padding: 1rem;
-    border-radius: 8px;
-    margin-bottom: 1rem;
-}
-
-.pricing-summary {
-    background: #e8f5e8;
-    padding: 1rem;
-    border-radius: 8px;
-    margin-top: 1rem;
-}
-
-.pricing-summary h4 {
-    color: #27ae60;
-    font-size: 1.2rem;
 }
