@@ -22,80 +22,242 @@
             </div>
         </div>
 
-        <!-- Form Container -->
-        <div class="form-container">
-            <!-- Customer Info -->
-            <div class="form-section">
-                <h2 data-translate="customerInfo">Customer Information</h2>
-                <div class="form-group">
-                    <label data-translate="fbName">Your Facebook name *</label>
-                    <input type="text" id="fbName" placeholder="Enter your Facebook name" required>
-                </div>
-                <div class="form-group">
-                    <label data-translate="email">Email *</label>
-                    <input type="email" id="email" required placeholder="your@email.com">
-                </div>
-            </div>
-
-            <!-- Canvas Order Type -->
-            <div class="form-section">
-                <h2 data-translate="orderType">Canvas Order</h2>
+        <!-- Main Content Container (2-column layout) -->
+        <div class="main-content">
+            <!-- Form Container -->
+            <div class="form-container">
                 
-                <!-- Multi Canvas Checkbox -->
-                <div class="checkbox-wrapper">
-                    <input type="checkbox" id="multiCanvasToggle" onchange="toggleMultiCanvas()">
-                    <label for="multiCanvasToggle" data-translate="multiCanvasLabel">I want to order multiple different canvas</label>
-                </div>
-                
-                <!-- Canvas Quantity Selector (hidden by default) -->
-                <div id="canvasQuantitySection" style="display: none;">
+                <!-- Canvas Type Selection with FAQ Button -->
+                <div class="form-section">
+                    <div class="section-header">
+                        <h2 data-translate="canvasType">Select Canvas Type</h2>
+                        <button class="faq-button" onclick="openFAQ()" data-translate="faqButton">❓ FAQ</button>
+                    </div>
                     <div class="form-group">
-                        <label data-translate="selectQuantity">How many canvas?</label>
-                        <select id="canvasQuantity" onchange="updateCanvasCount()">
-                            <option value="2">2 Canvas</option>
-                            <option value="3">3 Canvas</option>
-                            <option value="4">4 Canvas</option>
-                            <option value="5">5 Canvas</option>
-                            <option value="6">6 Canvas</option>
-                            <option value="7">7 Canvas</option>
-                            <option value="8">8 Canvas</option>
-                            <option value="9">9 Canvas</option>
-                            <option value="10">10 Canvas</option>
+                        <select id="canvasType" onchange="handleCanvasTypeChange()">
+                            <option value="single" data-translate="singleCanvas">Single Canvas</option>
+                            <option value="multi" data-translate="multiCanvas">Multiple Different Canvas</option>
+                            <option value="collage" data-translate="collageCanvas">Collage Multiple Images</option>
                         </select>
                     </div>
-                    <div id="discountNotification" class="discount-notification" style="display: none;">
-                        <span class="discount-icon">🎉</span>
-                        <span class="discount-text" data-translate="discountText"></span>
+                    
+                    <!-- Multi Canvas Quantity (hidden by default) -->
+                    <div id="multiCanvasSection" style="display: none;">
+                        <div class="form-group">
+                            <label data-translate="selectQuantity">How many different canvas?</label>
+                            <select id="canvasQuantity" onchange="updateCanvasCount()">
+                                <option value="2">2 Canvas</option>
+                                <option value="3">3 Canvas</option>
+                                <option value="4">4 Canvas</option>
+                                <option value="5">5 Canvas</option>
+                                <option value="6">6 Canvas</option>
+                                <option value="7">7 Canvas</option>
+                                <option value="8">8 Canvas</option>
+                                <option value="9">9 Canvas</option>
+                                <option value="10">10 Canvas</option>
+                            </select>
+                        </div>
+                        <div id="discountNotification" class="discount-notification" style="display: none;">
+                            <span class="discount-icon">🎉</span>
+                            <span class="discount-text" data-translate="discountText"></span>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Canvas Tabs -->
-                <div id="canvasTabs" class="canvas-tabs">
+                <!-- Canvas Tabs (for multi canvas) -->
+                <div id="canvasTabs" class="canvas-tabs" style="display: none;">
                     <div class="tab active" onclick="switchCanvas(0)">Canvas 1</div>
                 </div>
 
                 <!-- Canvas Items Container -->
                 <div id="canvasItemsContainer" class="canvas-items-container">
-                    <!-- Canvas items will be dynamically added here -->
+                    
+                    <!-- Size Selection (2x2 Grid) -->
+                    <div class="form-section canvas-item" data-canvas="0">
+                        <h2 data-translate="selectSize">Select Size *</h2>
+                        <div class="size-grid">
+                            <div class="size-option" data-size="8x10" onclick="selectSize('8x10', 0)">
+                                <div class="size-label">8x10"</div>
+                                <div class="size-price" data-base-price="34">$34</div>
+                            </div>
+                            <div class="size-option" data-size="11x14" onclick="selectSize('11x14', 0)">
+                                <div class="size-label">11x14"</div>
+                                <div class="size-price" data-base-price="43">$43</div>
+                                <div class="best-seller" data-translate="bestSeller">Best Seller</div>
+                            </div>
+                            <div class="size-option" data-size="16x20" onclick="selectSize('16x20', 0)">
+                                <div class="size-label">16x20"</div>
+                                <div class="size-price" data-base-price="62">$62</div>
+                            </div>
+                            <div class="size-option" data-size="20x30" onclick="selectSize('20x30', 0)">
+                                <div class="size-label">20x30"</div>
+                                <div class="size-price" data-base-price="82">$82</div>
+                            </div>
+                        </div>
+                        <div class="validation-error" id="size-error-0"></div>
+                    </div>
+
+                    <!-- Two Person Canvas Checkbox -->
+                    <div class="form-section canvas-item" data-canvas="0" id="twoPersonSection-0">
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" id="twoPersonCanvas-0" onchange="handleTwoPersonChange(0)">
+                            <label for="twoPersonCanvas-0" data-translate="twoPersonLabel">2 people on 1 canvas (+$10)</label>
+                        </div>
+                    </div>
+
+                    <!-- Image Upload Section -->
+                    <div class="form-section canvas-item" data-canvas="0">
+                        <h2 data-translate="uploadImages">Upload Images *</h2>
+                        <div class="upload-container">
+                            <div class="upload-area" onclick="triggerFileInput(0)">
+                                <div class="upload-icon">📷</div>
+                                <div class="upload-text" data-translate="uploadText">Click to upload images (Max 6)</div>
+                                <div class="upload-subtext" data-translate="uploadSubtext">Supports JPG, PNG - Will be cropped to 8:10 ratio</div>
+                            </div>
+                            <input type="file" id="imageInput-0" multiple accept="image/*" style="display: none;" onchange="handleImageUpload(event, 0)">
+                            
+                            <!-- Image Thumbnails -->
+                            <div class="image-thumbnails" id="imageThumbnails-0">
+                                <!-- Thumbnails will be added here -->
+                            </div>
+                        </div>
+                        <div class="validation-error" id="image-error-0"></div>
+                    </div>
+
+                    <!-- Custom Text -->
+                    <div class="form-section canvas-item" data-canvas="0">
+                        <div class="form-group">
+                            <label data-translate="customText">Enter your text</label>
+                            <input type="text" id="customText-0" placeholder="e.g., Forever Together" onkeyup="updatePreview(0)" data-translate-placeholder="customTextPlaceholder">
+                        </div>
+                    </div>
+
+                    <!-- Date -->
+                    <div class="form-section canvas-item" data-canvas="0">
+                        <div class="form-group">
+                            <label data-translate="date">Date</label>
+                            <input type="text" id="date-0" placeholder="e.g., Dec 25, 2024" onkeyup="updatePreview(0)" data-translate-placeholder="datePlaceholder">
+                        </div>
+                    </div>
+
+                    <!-- Welcome Home -->
+                    <div class="form-section canvas-item" data-canvas="0" id="welcomeHomeSection-0">
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" id="welcomeHome-0" onchange="handleWelcomeHomeChange(0)">
+                            <label for="welcomeHome-0" data-translate="welcomeHome">Welcome Home</label>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Notes Section -->
+                <div class="form-section">
+                    <div class="form-group">
+                        <label data-translate="notes">Additional Notes</label>
+                        <textarea id="notes" rows="3" placeholder="Special instructions..." data-translate-placeholder="notesPlaceholder"></textarea>
+                    </div>
+                </div>
+
+                <!-- Customer Info (moved to bottom) -->
+                <div class="form-section">
+                    <h2 data-translate="customerInfo">Customer Information</h2>
+                    <div class="form-group">
+                        <label data-translate="fbName">Your Facebook name *</label>
+                        <input type="text" id="fbName" placeholder="Enter your Facebook name" required data-translate-placeholder="fbNamePlaceholder">
+                        <div class="validation-error" id="fbName-error"></div>
+                    </div>
+                    <div class="form-group">
+                        <label data-translate="email">Email *</label>
+                        <input type="email" id="email" required placeholder="your@email.com" data-translate-placeholder="emailPlaceholder">
+                        <div class="validation-error" id="email-error"></div>
+                    </div>
+                </div>
+
+                <!-- Price Summary -->
+                <div class="price-summary-bottom">
+                    <span data-translate="estimatedTotal">Estimated Total</span>: 
+                    <span class="total-price" id="totalPrice">$0</span>
+                </div>
+
+                <!-- Submit Button -->
+                <button class="submit-btn" onclick="confirmOrder()" data-translate="submit">Submit Order</button>
+            </div>
+
+            <!-- Preview Section (Sticky) -->
+            <div class="preview-section" id="previewSection">
+                <h2 data-translate="preview">Canvas Preview</h2>
+                <div class="preview-container">
+                    <canvas id="previewCanvas" width="400" height="500"></canvas>
+                    <div class="preview-notice" data-translate="previewNotice">
+                        This is only a preview for your custom text. The final canvas preview will be sent to your email and Messenger.
+                    </div>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- Notes Section -->
-            <div class="form-section">
-                <div class="form-group">
-                    <label data-translate="notes">Additional Notes</label>
-                    <textarea id="notes" rows="3" placeholder="Special instructions..."></textarea>
+    <!-- FAQ Modal -->
+    <div id="faqModal" class="modal">
+        <div class="modal-content faq-content">
+            <div class="modal-header">
+                <h3 data-translate="faqTitle">Frequently Asked Questions</h3>
+                <span class="close" onclick="closeFAQ()">&times;</span>
+            </div>
+            <div class="faq-body">
+                <!-- Shipping Section -->
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFAQ(this)">
+                        <span data-translate="shippingTitle">🚚 <strong>Shipping</strong></span>
+                        <span class="faq-toggle">+</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p data-translate="deliveryTime"><strong>Delivery Time:</strong></p>
+                        <ul>
+                            <li data-translate="usDelivery">US: 5–10 business days</li>
+                            <li data-translate="intlDelivery">International: 7–15 business days</li>
+                        </ul>
+                        <p data-translate="orderTracking"><strong>Order Tracking:</strong> Sent via email automatically after purchase</p>
+                        <p data-translate="securePackaging"><strong>Secure Packaging:</strong> Shock-resistant, moisture-proof, and gift-ready</p>
+                    </div>
+                </div>
+
+                <!-- Payment Section -->
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFAQ(this)">
+                        <span data-translate="paymentTitle">💳 <strong>Payment</strong></span>
+                        <span class="faq-toggle">+</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p data-translate="acceptedMethods"><strong>Accepted Methods:</strong></p>
+                        <ul>
+                            <li data-translate="creditCards">Credit / Debit Cards</li>
+                            <li data-translate="paypal">PayPal</li>
+                            <li data-translate="applePay">Apple Pay</li>
+                        </ul>
+                        <p data-translate="secureCheckout"><strong>Secure Checkout:</strong> All payments are encrypted and processed safely</p>
+                        <p data-translate="fastEasy"><strong>Fast & Easy:</strong> No account needed — just a few quick steps</p>
+                    </div>
+                </div>
+
+                <!-- How It Works Section -->
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFAQ(this)">
+                        <span data-translate="howItWorksTitle">🧑‍🎨 <strong>How It Works</strong></span>
+                        <span class="faq-toggle">+</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p data-translate="noLivePreview">This canvas doesn't support live previews — but don't worry!</p>
+                        <p data-translate="designerEnhance">✅ Our designers will enhance your photo to look its very best.</p>
+                        <p data-translate="completeDetails">📝 Once you've completed the canvas details,</p>
+                        <p data-translate="emailPreview">📩 You'll receive a preview via email within 1–2 business days.</p>
+                        <p data-translate="requestEdits">🖼️ You can request edits until you're completely satisfied.</p>
+                        <p data-translate="finalizeOrder">✅ Finalize your order and we'll take care of the rest.</p>
+                    </div>
                 </div>
             </div>
-
-            <!-- Price Summary -->
-            <div class="price-summary-bottom">
-                <span data-translate="estimatedTotal">Estimated Total</span>: 
-                <span class="total-price">$0</span>
+            <div class="faq-footer">
+                <button onclick="closeFAQ()" class="primary-btn" data-translate="backToForm">Back to Form</button>
             </div>
-
-            <!-- Submit Button -->
-            <button class="submit-btn" onclick="confirmOrder()" data-translate="submit">Submit Order</button>
         </div>
     </div>
 
