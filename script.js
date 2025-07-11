@@ -3,9 +3,9 @@ let currentCanvasIndex = 0;
 let canvasData = {};
 let cropper = null;
 let currentCropImageIndex = 0;
-let isPreviewSticky = false;
+let formState = {}; // For data persistence
 
-// Canvas Size Configuration with EXACT pricing as required
+// Canvas Size Configuration with EXACT pricing
 const canvasSizes = {
     "8x10": { price: 34, label: "8x10\" - $34" },
     "11x14": { price: 43, label: "11x14\" - $43 (Best Seller)" },
@@ -13,12 +13,21 @@ const canvasSizes = {
     "20x30": { price: 82, label: "20x30\" - $82" }
 };
 
-// Background images (adjust paths if using different folder structure)
+// Background images
 const canvasImages = {
     single: 'canvas-bg-single.jpg',
     couple: 'canvas-bg-couple.jpg',
     welcomeHome: 'welcome-home-overlay.png'
 };
+
+// Progress steps configuration
+const progressSteps = [
+    { id: 'canvas-type', label: 'Canvas Type', required: true },
+    { id: 'size', label: 'Size', required: true },
+    { id: 'upload', label: 'Upload', required: true },
+    { id: 'details', label: 'Details', required: false },
+    { id: 'submit', label: 'Submit', required: false }
+];
 
 // Initialize when page loads
 document.addEventListener('DOMContentLoaded', function() {
@@ -26,9 +35,120 @@ document.addEventListener('DOMContentLoaded', function() {
     autoFillFacebookName();
     setupEventListeners();
     initializeCanvas(0);
+    initializeProgressIndicators();
     updatePreview(0);
     loadFonts();
+    detectAndSetLanguage();
 });
+
+// Language Detection and Setup
+function detectAndSetLanguage() {
+    let detectedLang = 'en'; // Default
+    
+    // Priority 1: URL parameter
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlLang = urlParams.get('lang') || urlParams.get('language');
+    
+    if (urlLang === 'es') {
+        detectedLang = 'es';
+    } else if (urlLang === 'en') {
+        detectedLang = 'en';
+    } else {
+        // Priority 2: Browser language
+        const browserLang = navigator.language || navigator.userLanguage;
+        if (browserLang.startsWith('es')) {
+            detectedLang = 'es';
+        }
+        
+        // Priority 3: Saved preference
+        const savedLang = localStorage.getItem('preferredLanguage');
+        if (savedLang && (savedLang === 'es' || savedLang === 'en')) {
+            detectedLang = savedLang;
+        }
+    }
+    
+    // Set language
+    if (window.translations && window.translations.changeLanguage) {
+        window.translations.changeLanguage(detectedLang);
+    }
+}
+
+// Initialize Progress Indicators
+function initializeProgressIndicators() {
+    const container = document.querySelector('.form-container');
+    if (!container) return;
+    
+    const progressHTML = `
+        <div class="progress-container">
+            <div class="progress-steps">
+                <div class="progress-line">
+                    <div class="progress-line-fill"></div>
+                </div>
+                ${progressSteps.map((step, index) => `
+                    <div class="progress-step" data-step="${step.id}">
+                        <div class="step-circle" data-step="${step.id}">
+                            ${index + 1}
+                        </div>
+                        <div class="step-label" data-step="${step.id}">
+                            ${step.label}
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        </div>
+    `;
+    
+    container.insertAdjacentHTML('afterbegin', progressHTML);
+    updateProgressIndicators();
+}
+
+// Update Progress Indicators
+function updateProgressIndicators() {
+    const canvasType = document.getElementById('canvasType')?.value;
+    const hasSize = canvasData[currentCanvasIndex]?.size;
+    const hasImages = canvasData[currentCanvasIndex]?.images?.length > 0;
+    const hasCustomerInfo = document.getElementById('fbName')?.value && document.getElementById('email')?.value;
+    
+    const progress = {
+        'canvas-type': !!canvasType,
+        'size': !!hasSize,
+        'upload': !!hasImages,
+        'details': true, // Always true as it's optional
+        'submit': hasCustomerInfo && hasSize && hasImages
+    };
+    
+    let completedSteps = 0;
+    const totalSteps = progressSteps.length;
+    
+    progressSteps.forEach((step, index) => {
+        const circle = document.querySelector(`.step-circle[data-step="${step.id}"]`);
+        const label = document.querySelector(`.step-label[data-step="${step.id}"]`);
+        
+        if (circle && label) {
+            if (progress[step.id]) {
+                circle.classList.add('completed');
+                circle.classList.remove('active');
+                completedSteps++;
+            } else {
+                circle.classList.remove('completed');
+                circle.classList.add('active');
+            }
+            
+            if (progress[step.id]) {
+                label.classList.add('active');
+            } else {
+                label.classList.remove('active');
+            }
+        }
+    });
+    
+    // Update progress line
+    const progressLine = document.querySelector('.progress-line-fill');
+    if (progressLine) {
+        const percentage = (completedSteps / totalSteps) * 100;
+        progressLine.style.width = `${percentage}%`;
+    }
+}
 
 // Load custom fonts
 function loadFonts() {
@@ -51,11 +171,7 @@ function autoFillFacebookName() {
         const fbNameInput = document.getElementById('fbName');
         if (fbNameInput) {
             fbNameInput.value = decodeURIComponent(fbName);
-            // Clear validation error if exists
-            const errorElement = document.getElementById('fbName-error');
-            if (errorElement) {
-                errorElement.classList.remove('show');
-            }
+            validateFacebookName();
         }
     }
 }
@@ -86,6 +202,62 @@ function initializeForm() {
     
     // Initialize preview canvas
     loadBackgroundImage('single');
+    
+    // Save initial form state
+    saveFormState();
+}
+
+// Save form state for persistence
+function saveFormState() {
+    const fbName = document.getElementById('fbName')?.value || '';
+    const email = document.getElementById('email')?.value || '';
+    const notes = document.getElementById('notes')?.value || '';
+    
+    formState = {
+        customerInfo: { fbName, email, notes },
+        canvasData: JSON.parse(JSON.stringify(canvasData))
+    };
+}
+
+// Restore form state
+function restoreFormState() {
+    if (formState.customerInfo) {
+        const fbNameInput = document.getElementById('fbName');
+        const emailInput = document.getElementById('email');
+        const notesInput = document.getElementById('notes');
+        
+        if (fbNameInput) fbNameInput.value = formState.customerInfo.fbName || '';
+        if (emailInput) emailInput.value = formState.customerInfo.email || '';
+        if (notesInput) notesInput.value = formState.customerInfo.notes || '';
+    }
+    
+    // Restore canvas data for first canvas if switching back to single
+    if (formState.canvasData && formState.canvasData[0]) {
+        const firstCanvas = formState.canvasData[0];
+        if (firstCanvas.size) {
+            selectSize(firstCanvas.size, 0);
+        }
+        if (firstCanvas.images && firstCanvas.images.length > 0) {
+            canvasData[0].images = [...firstCanvas.images];
+            updateImageThumbnails(0);
+        }
+        if (firstCanvas.customText) {
+            const textInput = document.getElementById('customText-0');
+            if (textInput) textInput.value = firstCanvas.customText;
+        }
+        if (firstCanvas.date) {
+            const dateInput = document.getElementById('date-0');
+            if (dateInput) dateInput.value = firstCanvas.date;
+        }
+        if (firstCanvas.welcomeHome) {
+            const welcomeInput = document.getElementById('welcomeHome-0');
+            if (welcomeInput) welcomeInput.checked = firstCanvas.welcomeHome;
+        }
+        if (firstCanvas.twoPersonCanvas) {
+            const twoPersonInput = document.getElementById('twoPersonCanvas-0');
+            if (twoPersonInput) twoPersonInput.checked = firstCanvas.twoPersonCanvas;
+        }
+    }
 }
 
 // Setup event listeners
@@ -96,6 +268,13 @@ function setupEventListeners() {
     
     if (fbNameInput) fbNameInput.addEventListener('input', validateFacebookName);
     if (emailInput) emailInput.addEventListener('input', validateEmail);
+    
+    // Save state on input changes
+    document.addEventListener('input', function(e) {
+        if (e.target.id === 'fbName' || e.target.id === 'email' || e.target.id === 'notes') {
+            saveFormState();
+        }
+    });
     
     // Close modals when clicking outside
     const faqModal = document.getElementById('faqModal');
@@ -120,14 +299,20 @@ function setupEventListeners() {
         });
     }
     
-    // Scroll event for sticky preview
-    window.addEventListener('scroll', handleStickyPreview);
-    
-    // Focus events for text inputs to trigger sticky behavior
-    document.addEventListener('focusin', function(e) {
-        if (e.target.id && (e.target.id.includes('customText') || e.target.id.includes('date'))) {
-            enableStickyPreview();
-        }
+    // Prevent zoom on input focus for mobile
+    const inputs = document.querySelectorAll('input[type="text"], input[type="email"], textarea, select');
+    inputs.forEach(input => {
+        input.addEventListener('focus', function() {
+            if (window.innerWidth <= 768) {
+                document.querySelector('meta[name="viewport"]').setAttribute('content', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no');
+            }
+        });
+        
+        input.addEventListener('blur', function() {
+            if (window.innerWidth <= 768) {
+                document.querySelector('meta[name="viewport"]').setAttribute('content', 'width=device-width, initial-scale=1');
+            }
+        });
     });
 }
 
@@ -135,21 +320,37 @@ function setupEventListeners() {
 function handleCanvasTypeChange() {
     const canvasType = document.getElementById('canvasType').value;
     
-    // Reset current canvas data
-    canvasData[currentCanvasIndex] = {
-        canvasType: canvasType,
-        size: null,
-        basePrice: 0,
-        twoPersonCanvas: false,
-        images: [],
-        customText: '',
-        date: '',
-        welcomeHome: false,
-        totalPrice: 0
-    };
+    // Save current form state before switching
+    saveFormState();
     
-    // Clear form inputs
-    clearFormInputs();
+    // Clear current canvas data except for first canvas if switching back to single
+    if (canvasType === 'single') {
+        // Keep only first canvas data
+        const firstCanvas = canvasData[0];
+        canvasData = { 0: firstCanvas || {} };
+        currentCanvasIndex = 0;
+        
+        // Restore form state
+        restoreFormState();
+    } else {
+        // Reset for multi/collage
+        canvasData[currentCanvasIndex] = {
+            canvasType: canvasType,
+            size: null,
+            basePrice: 0,
+            twoPersonCanvas: false,
+            images: [],
+            customText: '',
+            date: '',
+            welcomeHome: false,
+            totalPrice: 0
+        };
+    }
+    
+    // Update canvas type in data
+    if (canvasData[currentCanvasIndex]) {
+        canvasData[currentCanvasIndex].canvasType = canvasType;
+    }
     
     // Show appropriate sections
     showCanvasTypeSections(canvasType);
@@ -158,6 +359,7 @@ function handleCanvasTypeChange() {
     loadBackgroundImage(canvasType === 'single' ? 'single' : 'single');
     updatePreview(currentCanvasIndex);
     updatePricing();
+    updateProgressIndicators();
 }
 
 // Show/hide sections based on canvas type
@@ -195,27 +397,38 @@ function updateCanvasCount() {
     const tabsContainer = document.getElementById('canvasTabs');
     const itemsContainer = document.getElementById('canvasItemsContainer');
     
-    // Clear existing tabs and items
+    // Clear existing tabs
     if (tabsContainer) tabsContainer.innerHTML = '';
-    if (itemsContainer) itemsContainer.innerHTML = '';
     
-    // Create new tabs and canvas items
+    // Hide all existing canvas items
+    document.querySelectorAll('.canvas-item').forEach(item => {
+        item.style.display = 'none';
+    });
+    
+    // Create new tabs and ensure canvas items exist
     for (let i = 0; i < quantity; i++) {
         createCanvasTab(i);
-        createCanvasItem(i);
         
-        // Initialize canvas data
-        canvasData[i] = {
-            canvasType: 'multi',
-            size: null,
-            basePrice: 0,
-            twoPersonCanvas: false,
-            images: [],
-            customText: '',
-            date: '',
-            welcomeHome: false,
-            totalPrice: 0
-        };
+        // Check if canvas item exists, if not create it
+        const existingItem = document.querySelector(`[data-canvas="${i}"]`);
+        if (!existingItem) {
+            createCanvasItem(i);
+        }
+        
+        // Initialize canvas data if not exists
+        if (!canvasData[i]) {
+            canvasData[i] = {
+                canvasType: 'multi',
+                size: null,
+                basePrice: 0,
+                twoPersonCanvas: false,
+                images: [],
+                customText: '',
+                date: '',
+                welcomeHome: false,
+                totalPrice: 0
+            };
+        }
     }
     
     // Show first canvas
@@ -223,6 +436,7 @@ function updateCanvasCount() {
     
     // Show discount notification
     showDiscountNotification(quantity);
+    updateProgressIndicators();
 }
 
 // Create canvas tab
@@ -234,6 +448,18 @@ function createCanvasTab(index) {
     tab.className = index === 0 ? 'tab active' : 'tab';
     tab.textContent = `Canvas ${index + 1}`;
     tab.onclick = () => switchCanvas(index);
+    tab.setAttribute('tabindex', '0');
+    tab.setAttribute('role', 'button');
+    tab.setAttribute('aria-label', `Switch to Canvas ${index + 1}`);
+    
+    // Keyboard navigation
+    tab.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            switchCanvas(index);
+        }
+    });
+    
     tabsContainer.appendChild(tab);
 }
 
@@ -252,20 +478,20 @@ function createCanvasItem(index) {
         <div class="form-section">
             <h2 data-translate="selectSize">Select Size *</h2>
             <div class="size-grid">
-                <div class="size-option" data-size="8x10" onclick="selectSize('8x10', ${index})">
+                <div class="size-option" data-size="8x10" onclick="selectSize('8x10', ${index})" tabindex="0" role="button" aria-label="Select 8x10 inch canvas for $34">
                     <div class="size-label">8x10"</div>
                     <div class="size-price" data-base-price="34">$34</div>
                 </div>
-                <div class="size-option" data-size="11x14" onclick="selectSize('11x14', ${index})">
+                <div class="size-option" data-size="11x14" onclick="selectSize('11x14', ${index})" tabindex="0" role="button" aria-label="Select 11x14 inch canvas for $43, Best Seller">
                     <div class="size-label">11x14"</div>
                     <div class="size-price" data-base-price="43">$43</div>
                     <div class="best-seller" data-translate="bestSeller">Best Seller</div>
                 </div>
-                <div class="size-option" data-size="16x20" onclick="selectSize('16x20', ${index})">
+                <div class="size-option" data-size="16x20" onclick="selectSize('16x20', ${index})" tabindex="0" role="button" aria-label="Select 16x20 inch canvas for $62">
                     <div class="size-label">16x20"</div>
                     <div class="size-price" data-base-price="62">$62</div>
                 </div>
-                <div class="size-option" data-size="20x30" onclick="selectSize('20x30', ${index})">
+                <div class="size-option" data-size="20x30" onclick="selectSize('20x30', ${index})" tabindex="0" role="button" aria-label="Select 20x30 inch canvas for $82">
                     <div class="size-label">20x30"</div>
                     <div class="size-price" data-base-price="82">$82</div>
                 </div>
@@ -276,8 +502,8 @@ function createCanvasItem(index) {
         <!-- Two Person Canvas Checkbox -->
         <div class="form-section" id="twoPersonSection-${index}">
             <div class="checkbox-wrapper">
-                <input type="checkbox" id="twoPersonCanvas-${index}" onchange="handleTwoPersonChange(${index})">
-                <label for="twoPersonCanvas-${index}" data-translate="twoPersonLabel">2 people on 1 canvas (+$10)</label>
+                <input type="checkbox" id="twoPersonCanvas-${index}" onchange="handleTwoPersonChange(${index})" aria-describedby="twoPersonLabel-${index}">
+                <label for="twoPersonCanvas-${index}" id="twoPersonLabel-${index}" data-translate="twoPersonLabel">2 people on 1 canvas (+$10)</label>
             </div>
         </div>
 
@@ -285,13 +511,13 @@ function createCanvasItem(index) {
         <div class="form-section">
             <h2 data-translate="uploadImages">Upload Images *</h2>
             <div class="upload-container">
-                <div class="upload-area" onclick="triggerFileInput(${index})">
+                <div class="upload-area" onclick="triggerFileInput(${index})" tabindex="0" role="button" aria-label="Click to upload images">
                     <div class="upload-icon">📷</div>
                     <div class="upload-text" data-translate="uploadText">Click to upload images (Max 6)</div>
                     <div class="upload-subtext" data-translate="uploadSubtext">Supports JPG, PNG - Will be cropped to 8:10 ratio</div>
                 </div>
-                <input type="file" id="imageInput-${index}" multiple accept="image/*" style="display: none;" onchange="handleImageUpload(event, ${index})">
-                <div class="image-thumbnails" id="imageThumbnails-${index}"></div>
+                <input type="file" id="imageInput-${index}" multiple accept="image/*" style="display: none;" onchange="handleImageUpload(event, ${index})" aria-label="Select image files">
+                <div class="image-thumbnails" id="imageThumbnails-${index}" role="list" aria-label="Uploaded images"></div>
             </div>
             <div class="validation-error" id="image-error-${index}"></div>
         </div>
@@ -299,29 +525,59 @@ function createCanvasItem(index) {
         <!-- Custom Text -->
         <div class="form-section">
             <div class="form-group">
-                <label data-translate="customText">Enter your text</label>
-                <input type="text" id="customText-${index}" placeholder="e.g., Forever Together" onkeyup="updatePreview(${index})" data-translate-placeholder="customTextPlaceholder">
+                <label for="customText-${index}" data-translate="customText">Enter your text</label>
+                <input type="text" id="customText-${index}" placeholder="e.g., Forever Together" onkeyup="updatePreview(${index})" data-translate-placeholder="customTextPlaceholder" aria-describedby="customTextHelp-${index}">
+                <div id="customTextHelp-${index}" class="sr-only">Enter custom text to display on your canvas</div>
             </div>
         </div>
 
         <!-- Date -->
         <div class="form-section">
             <div class="form-group">
-                <label data-translate="date">Date</label>
-                <input type="text" id="date-${index}" placeholder="e.g., Dec 25, 2024" onkeyup="updatePreview(${index})" data-translate-placeholder="datePlaceholder">
+                <label for="date-${index}" data-translate="date">Date</label>
+                <input type="text" id="date-${index}" placeholder="e.g., Dec 25, 2024" onkeyup="updatePreview(${index})" data-translate-placeholder="datePlaceholder" aria-describedby="dateHelp-${index}">
+                <div id="dateHelp-${index}" class="sr-only">Enter a date to display on your canvas</div>
             </div>
         </div>
 
         <!-- Welcome Home -->
         <div class="form-section" id="welcomeHomeSection-${index}">
             <div class="checkbox-wrapper">
-                <input type="checkbox" id="welcomeHome-${index}" onchange="handleWelcomeHomeChange(${index})">
-                <label for="welcomeHome-${index}" data-translate="welcomeHome">Welcome Home</label>
+                <input type="checkbox" id="welcomeHome-${index}" onchange="handleWelcomeHomeChange(${index})" aria-describedby="welcomeHomeLabel-${index}">
+                <label for="welcomeHome-${index}" id="welcomeHomeLabel-${index}" data-translate="welcomeHome">Welcome Home</label>
             </div>
         </div>
     `;
     
+    // Add keyboard navigation for size options
+    const sizeOptions = canvasItem.querySelectorAll('.size-option');
+    sizeOptions.forEach(option => {
+        option.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                const size = this.getAttribute('data-size');
+                selectSize(size, index);
+            }
+        });
+    });
+    
+    // Add keyboard navigation for upload area
+    const uploadArea = canvasItem.querySelector('.upload-area');
+    if (uploadArea) {
+        uploadArea.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                triggerFileInput(index);
+            }
+        });
+    }
+    
     itemsContainer.appendChild(canvasItem);
+    
+    // Translate new content
+    if (window.translations && window.translations.translatePage) {
+        window.translations.translatePage();
+    }
 }
 
 // Switch between canvas tabs
@@ -331,6 +587,7 @@ function switchCanvas(index) {
     // Update tab active state
     document.querySelectorAll('.tab').forEach((tab, i) => {
         tab.classList.toggle('active', i === index);
+        tab.setAttribute('aria-selected', i === index);
     });
     
     // Show/hide canvas items
@@ -341,6 +598,7 @@ function switchCanvas(index) {
     // Update preview
     updatePreview(index);
     updatePricing();
+    updateProgressIndicators();
 }
 
 // Select canvas size
@@ -348,12 +606,14 @@ function selectSize(size, canvasIndex) {
     // Remove previous selection
     document.querySelectorAll(`[data-canvas="${canvasIndex}"] .size-option`).forEach(option => {
         option.classList.remove('selected');
+        option.setAttribute('aria-selected', 'false');
     });
     
     // Add selection to clicked option
     const selectedOption = document.querySelector(`[data-canvas="${canvasIndex}"] .size-option[data-size="${size}"]`);
     if (selectedOption) {
         selectedOption.classList.add('selected');
+        selectedOption.setAttribute('aria-selected', 'true');
     }
     
     // Update canvas data
@@ -371,6 +631,7 @@ function selectSize(size, canvasIndex) {
     
     // Update pricing
     updatePricing();
+    updateProgressIndicators();
 }
 
 // Handle two person canvas change
@@ -406,6 +667,11 @@ function updateSizePrices(canvasIndex, addTenDollars) {
         const basePrice = parseInt(priceElement.getAttribute('data-base-price'));
         const newPrice = addTenDollars ? basePrice + 10 : basePrice;
         priceElement.textContent = `$${newPrice}`;
+        
+        // Update aria-label
+        const size = option.getAttribute('data-size');
+        const isBestSeller = option.querySelector('.best-seller') ? ', Best Seller' : '';
+        option.setAttribute('aria-label', `Select ${size} inch canvas for $${newPrice}${isBestSeller}`);
     });
 }
 
@@ -428,7 +694,8 @@ function handleImageUpload(event, canvasIndex) {
     const totalImages = currentImages.length + files.length;
     
     if (totalImages > 6) {
-        alert('Maximum 6 images allowed per canvas');
+        const message = window.translations?.t ? window.translations.t('maxImagesError') : 'Maximum 6 images allowed per canvas';
+        alert(message);
         return;
     }
     
@@ -457,6 +724,8 @@ function processImageFile(file, canvasIndex) {
         }
         if (cropModal) {
             cropModal.style.display = 'block';
+            // Add aria-hidden to main content
+            document.querySelector('.container').setAttribute('aria-hidden', 'true');
         }
         
         // Initialize cropper with 8:10 ratio
@@ -521,6 +790,7 @@ function applyCrop() {
     
     // Update preview
     updatePreview(currentCropImageIndex);
+    updateProgressIndicators();
     
     // Close crop modal
     cancelCrop();
@@ -531,6 +801,8 @@ function cancelCrop() {
     const cropModal = document.getElementById('cropModal');
     if (cropModal) {
         cropModal.style.display = 'none';
+        // Remove aria-hidden from main content
+        document.querySelector('.container').removeAttribute('aria-hidden');
     }
     
     if (cropper) {
@@ -551,9 +823,10 @@ function updateImageThumbnails(canvasIndex) {
     images.forEach((image, index) => {
         const thumbnail = document.createElement('div');
         thumbnail.className = 'image-thumbnail';
+        thumbnail.setAttribute('role', 'listitem');
         thumbnail.innerHTML = `
-            <img src="${image.data}" alt="Uploaded image">
-            <button class="delete-btn" onclick="deleteImage(${canvasIndex}, ${index})">×</button>
+            <img src="${image.data}" alt="Uploaded image ${index + 1}" loading="lazy">
+            <button class="delete-btn" onclick="deleteImage(${canvasIndex}, ${index})" aria-label="Delete image ${index + 1}" title="Delete image">×</button>
         `;
         container.appendChild(thumbnail);
     });
@@ -565,6 +838,7 @@ function deleteImage(canvasIndex, imageIndex) {
         canvasData[canvasIndex].images.splice(imageIndex, 1);
         updateImageThumbnails(canvasIndex);
         updatePreview(canvasIndex);
+        updateProgressIndicators();
     }
 }
 
@@ -615,6 +889,21 @@ function updatePreview(canvasIndex) {
     const ctx = canvas.getContext('2d');
     const canvasType = document.getElementById('canvasType').value;
     
+    // Set canvas size based on type and screen size
+    if (canvasType === 'collage') {
+        canvas.width = 500;
+        canvas.height = 400;
+    } else {
+        // Mobile optimization
+        if (window.innerWidth <= 768) {
+            canvas.width = 300;
+            canvas.height = 375;
+        } else {
+            canvas.width = 400;
+            canvas.height = 500;
+        }
+    }
+    
     if (canvasType === 'collage') {
         updateCollagePreview(canvasIndex);
         return;
@@ -646,12 +935,12 @@ function updatePreview(canvasIndex) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
         
-        // Draw custom text
+        // Draw custom text (left-bottom position)
         if (customText) {
             drawCustomText(ctx, customText, canvas.width, canvas.height);
         }
         
-        // Draw date
+        // Draw date (left-bottom position, smaller)
         if (date) {
             drawDate(ctx, date, canvas.width, canvas.height);
         }
@@ -673,10 +962,6 @@ function updateCollagePreview(canvasIndex) {
     const ctx = canvas.getContext('2d');
     const currentData = canvasData[canvasIndex] || {};
     const images = currentData.images || [];
-    
-    // Set canvas size for collage mode
-    canvas.width = 500;
-    canvas.height = 400;
     
     // Clear canvas
     ctx.fillStyle = '#ffffff';
@@ -732,36 +1017,42 @@ function updateCollagePreview(canvasIndex) {
     }
 }
 
-// Draw custom text with TextFont
+// Draw custom text - Left-bottom position, black text with white border
 function drawCustomText(ctx, text, canvasWidth, canvasHeight) {
-    ctx.font = '32px "TextFont", serif';
+    // Responsive font size
+    const fontSize = window.innerWidth <= 768 ? 24 : 32;
+    
+    ctx.font = `${fontSize}px "TextFont", serif`;
     ctx.fillStyle = '#000000';
-    ctx.strokeStyle = '#8B4513';
-    ctx.lineWidth = 1;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
     
-    const x = canvasWidth / 2;
-    const y = canvasHeight * 0.75; // 75% down from top
+    const x = 20; // Left margin
+    const y = canvasHeight - 60; // Bottom margin
     
-    // Draw text with stroke (border)
+    // Draw text with white border
     ctx.strokeText(text, x, y);
     ctx.fillText(text, x, y);
 }
 
-// Draw date with DateFont
+// Draw date - Left-bottom position, smaller font, black text with white border
 function drawDate(ctx, date, canvasWidth, canvasHeight) {
-    ctx.font = '18px "DateFont", serif';
+    // Responsive font size
+    const fontSize = window.innerWidth <= 768 ? 16 : 20;
+    
+    ctx.font = `${fontSize}px "DateFont", serif`;
     ctx.fillStyle = '#000000';
-    ctx.strokeStyle = '#8B4513';
-    ctx.lineWidth = 0.5;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
     
-    const x = canvasWidth / 2;
-    const y = canvasHeight * 0.85; // 85% down from top
+    const x = 20; // Left margin
+    const y = canvasHeight - 20; // Bottom margin, below text
     
-    // Draw date with stroke (border)
+    // Draw date with white border
     ctx.strokeText(date, x, y);
     ctx.fillText(date, x, y);
 }
@@ -772,13 +1063,17 @@ function drawWelcomeHomeOverlay(ctx, canvasWidth, canvasHeight) {
     welcomeImg.crossOrigin = 'anonymous';
     
     welcomeImg.onload = function() {
-        // Draw Welcome Home overlay (positioned like in your example)
+        // Draw Welcome Home overlay (positioned like in example)
         const overlayWidth = canvasWidth * 0.4;
         const overlayHeight = canvasHeight * 0.6;
         const x = canvasWidth - overlayWidth - 20;
         const y = 20;
         
         ctx.drawImage(welcomeImg, x, y, overlayWidth, overlayHeight);
+    };
+    
+    welcomeImg.onerror = function() {
+        console.error('Failed to load Welcome Home overlay');
     };
     
     welcomeImg.src = canvasImages.welcomeHome;
@@ -797,40 +1092,6 @@ function handleWelcomeHomeChange(canvasIndex) {
     
     // Update preview
     updatePreview(canvasIndex);
-    
-    // Handle sticky behavior
-    if (isChecked) {
-        // Remove sticky when Welcome Home is selected
-        disableStickyPreview();
-    }
-}
-
-// Enable sticky preview
-function enableStickyPreview() {
-    const previewSection = document.getElementById('previewSection');
-    const welcomeHomeCheckbox = document.getElementById(`welcomeHome-${currentCanvasIndex}`);
-    
-    if (previewSection && (!welcomeHomeCheckbox || !welcomeHomeCheckbox.checked)) {
-        previewSection.classList.add('sticky');
-        previewSection.classList.remove('unsticky');
-        isPreviewSticky = true;
-    }
-}
-
-// Disable sticky preview
-function disableStickyPreview() {
-    const previewSection = document.getElementById('previewSection');
-    if (previewSection) {
-        previewSection.classList.remove('sticky');
-        previewSection.classList.add('unsticky');
-        isPreviewSticky = false;
-    }
-}
-
-// Handle sticky preview behavior
-function handleStickyPreview() {
-    // This function is called on scroll events
-    // The sticky behavior is primarily handled by CSS and focus events
 }
 
 // Initialize canvas
@@ -851,17 +1112,21 @@ function showDiscountNotification(quantity) {
     const notification = document.getElementById('discountNotification');
     if (!notification) return;
     
-    const textElement = notification.querySelector('.discount-text');
-    if (!textElement) return;
-    
-    if (quantity >= 5) {
-        textElement.textContent = 'Amazing! You get 12% OFF for ordering 5+ canvas!';
-        notification.style.display = 'block';
-    } else if (quantity >= 3) {
-        textElement.textContent = 'Great! You get 5% OFF for ordering 3+ canvas!';
-        notification.style.display = 'block';
+    if (window.translations && window.translations.updateDiscountNotification) {
+        window.translations.updateDiscountNotification(quantity);
     } else {
-        notification.style.display = 'none';
+        const textElement = notification.querySelector('.discount-text');
+        if (!textElement) return;
+        
+        if (quantity >= 5) {
+            textElement.textContent = 'Amazing! You get 12% OFF for ordering 5+ canvas!';
+            notification.style.display = 'block';
+        } else if (quantity >= 3) {
+            textElement.textContent = 'Great! You get 5% OFF for ordering 3+ canvas!';
+            notification.style.display = 'block';
+        } else {
+            notification.style.display = 'none';
+        }
     }
 }
 
@@ -915,73 +1180,75 @@ function updatePricing() {
     // Update display
     const totalPriceElement = document.getElementById('totalPrice');
     if (totalPriceElement) {
-        totalPriceElement.textContent = `$${finalPrice.toFixed(2)}`;
+        if (window.translations && window.translations.formatCurrency) {
+            totalPriceElement.textContent = window.translations.formatCurrency(finalPrice);
+        } else {
+            totalPriceElement.textContent = `$${finalPrice.toFixed(2)}`;
+        }
     }
     
     return { totalPrice, discount, finalPrice, totalCanvases };
 }
 
-// Clear form inputs
-function clearFormInputs() {
-    // Clear text inputs (except customer info)
-    document.querySelectorAll('input[type="text"]').forEach(input => {
-        if (input.id !== 'fbName' && input.id !== 'email' && input.id !== 'notes') {
-            input.value = '';
-        }
-    });
-    
-    // Clear checkboxes
-    document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-        checkbox.checked = false;
-    });
-    
-    // Clear size selections
-    document.querySelectorAll('.size-option').forEach(option => {
-        option.classList.remove('selected');
-    });
-    
-    // Clear image thumbnails
-    document.querySelectorAll('.image-thumbnails').forEach(container => {
-        container.innerHTML = '';
-    });
-    
-    // Clear validation errors
-    document.querySelectorAll('.validation-error').forEach(error => {
-        error.classList.remove('show');
-    });
-}
-
 // Validation functions
 function validateFacebookName() {
     const input = document.getElementById('fbName');
-    const error = document.getElementById('fbName-error');
+    const errorId = 'fbName-error';
     
-    if (!input || !error) return false;
+    if (!input) return false;
     
     if (input.value.trim().length < 2) {
-        error.textContent = 'Facebook name must be at least 2 characters';
-        error.classList.add('show');
+        if (window.translations && window.translations.showValidationError) {
+            window.translations.showValidationError(errorId, 'fbNameTooShort');
+        } else {
+            const errorElement = document.getElementById(errorId);
+            if (errorElement) {
+                errorElement.textContent = 'Facebook name must be at least 2 characters';
+                errorElement.classList.add('show');
+            }
+        }
         return false;
     } else {
-        error.classList.remove('show');
+        if (window.translations && window.translations.hideValidationError) {
+            window.translations.hideValidationError(errorId);
+        } else {
+            const errorElement = document.getElementById(errorId);
+            if (errorElement) {
+                errorElement.classList.remove('show');
+            }
+        }
         return true;
     }
 }
 
 function validateEmail() {
     const input = document.getElementById('email');
-    const error = document.getElementById('email-error');
+    const errorId = 'email-error';
     
-    if (!input || !error) return false;
+    if (!input) return false;
     
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     
     if (!emailRegex.test(input.value)) {
-        error.textContent = 'Please enter a valid email address';
-        error.classList.add('show');
+        if (window.translations && window.translations.showValidationError) {
+            window.translations.showValidationError(errorId, 'emailInvalid');
+        } else {
+            const errorElement = document.getElementById(errorId);
+            if (errorElement) {
+                errorElement.textContent = 'Please enter a valid email address';
+                errorElement.classList.add('show');
+            }
+        }
         return false;
     } else {
-        error.classList.remove('show');
+        if (window.translations && window.translations.hideValidationError) {
+            window.translations.hideValidationError(errorId);
+        } else {
+            const errorElement = document.getElementById(errorId);
+            if (errorElement) {
+                errorElement.classList.remove('show');
+            }
+        }
         return true;
     }
 }
@@ -990,26 +1257,50 @@ function validateCanvas(canvasIndex) {
     let isValid = true;
     
     // Check size selection
-    const sizeError = document.getElementById(`size-error-${canvasIndex}`);
-    if (sizeError) {
-        if (!canvasData[canvasIndex]?.size) {
-            sizeError.textContent = 'Please select a canvas size';
-            sizeError.classList.add('show');
-            isValid = false;
+    const sizeErrorId = `size-error-${canvasIndex}`;
+    if (!canvasData[canvasIndex]?.size) {
+        if (window.translations && window.translations.showValidationError) {
+            window.translations.showValidationError(sizeErrorId, 'sizeRequired');
         } else {
-            sizeError.classList.remove('show');
+            const errorElement = document.getElementById(sizeErrorId);
+            if (errorElement) {
+                errorElement.textContent = 'Please select a canvas size';
+                errorElement.classList.add('show');
+            }
+        }
+        isValid = false;
+    } else {
+        if (window.translations && window.translations.hideValidationError) {
+            window.translations.hideValidationError(sizeErrorId);
+        } else {
+            const errorElement = document.getElementById(sizeErrorId);
+            if (errorElement) {
+                errorElement.classList.remove('show');
+            }
         }
     }
     
     // Check images
-    const imageError = document.getElementById(`image-error-${canvasIndex}`);
-    if (imageError) {
-        if (!canvasData[canvasIndex]?.images || canvasData[canvasIndex].images.length === 0) {
-            imageError.textContent = 'Please upload at least 1 image';
-            imageError.classList.add('show');
-            isValid = false;
+    const imageErrorId = `image-error-${canvasIndex}`;
+    if (!canvasData[canvasIndex]?.images || canvasData[canvasIndex].images.length === 0) {
+        if (window.translations && window.translations.showValidationError) {
+            window.translations.showValidationError(imageErrorId, 'imagesRequired');
         } else {
-            imageError.classList.remove('show');
+            const errorElement = document.getElementById(imageErrorId);
+            if (errorElement) {
+                errorElement.textContent = 'Please upload at least 1 image';
+                errorElement.classList.add('show');
+            }
+        }
+        isValid = false;
+    } else {
+        if (window.translations && window.translations.hideValidationError) {
+            window.translations.hideValidationError(imageErrorId);
+        } else {
+            const errorElement = document.getElementById(imageErrorId);
+            if (errorElement) {
+                errorElement.classList.remove('show');
+            }
         }
     }
     
@@ -1021,6 +1312,13 @@ function openFAQ() {
     const faqModal = document.getElementById('faqModal');
     if (faqModal) {
         faqModal.style.display = 'block';
+        document.querySelector('.container').setAttribute('aria-hidden', 'true');
+        
+        // Focus first focusable element
+        const firstFocusable = faqModal.querySelector('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
+        if (firstFocusable) {
+            firstFocusable.focus();
+        }
     }
 }
 
@@ -1028,6 +1326,13 @@ function closeFAQ() {
     const faqModal = document.getElementById('faqModal');
     if (faqModal) {
         faqModal.style.display = 'none';
+        document.querySelector('.container').removeAttribute('aria-hidden');
+        
+        // Return focus to FAQ button
+        const faqButton = document.querySelector('.faq-button');
+        if (faqButton) {
+            faqButton.focus();
+        }
     }
 }
 
@@ -1040,16 +1345,21 @@ function toggleFAQ(element) {
             answer.classList.remove('show');
             toggle.textContent = '+';
             element.classList.remove('active');
+            element.setAttribute('aria-expanded', 'false');
         } else {
             // Close all other FAQs
             document.querySelectorAll('.faq-answer').forEach(ans => ans.classList.remove('show'));
             document.querySelectorAll('.faq-toggle').forEach(tog => tog.textContent = '+');
-            document.querySelectorAll('.faq-question').forEach(q => q.classList.remove('active'));
+            document.querySelectorAll('.faq-question').forEach(q => {
+                q.classList.remove('active');
+                q.setAttribute('aria-expanded', 'false');
+            });
             
             // Open clicked FAQ
             answer.classList.add('show');
             toggle.textContent = '×';
             element.classList.add('active');
+            element.setAttribute('aria-expanded', 'true');
         }
     }
 }
@@ -1061,7 +1371,8 @@ function confirmOrder() {
     const emailValid = validateEmail();
     
     if (!fbNameValid || !emailValid) {
-        alert('Please fill in all required customer information');
+        const message = window.translations?.t ? window.translations.t('allFieldsRequired') : 'Please fill in all required customer information';
+        alert(message);
         return;
     }
     
@@ -1082,7 +1393,8 @@ function confirmOrder() {
     }
     
     if (!allCanvasValid) {
-        alert('Please complete all canvas requirements (size and at least 1 image)');
+        const message = window.translations?.t ? window.translations.t('canvasIncomplete') : 'Please complete all canvas requirements (size and at least 1 image)';
+        alert(message);
         return;
     }
     
@@ -1171,30 +1483,33 @@ function showOrderSummary() {
     
     summaryContainer.innerHTML = summaryHTML;
     modal.style.display = 'block';
+    document.querySelector('.container').setAttribute('aria-hidden', 'true');
 }
 
 function closeConfirmModal() {
     const modal = document.getElementById('confirmModal');
     if (modal) {
         modal.style.display = 'none';
+        document.querySelector('.container').removeAttribute('aria-hidden');
     }
 }
 
-// Submit order (ready for n8n integration)
+// Submit order - Show Thank You immediately
 function submitOrder() {
+    // Close confirm modal first
+    closeConfirmModal();
+    
+    // Show thank you page immediately
+    showThankYouPage();
+    
+    // Build order data for background submission
     const orderData = buildOrderData();
     
-    // Show loading state
-    const submitBtn = document.querySelector('#confirmModal .primary-btn');
-    if (submitBtn) {
-        const originalText = submitBtn.textContent;
-        submitBtn.textContent = 'Submitting...';
-        submitBtn.disabled = true;
-        
-        // TODO: Replace with your n8n webhook URL
-        const webhookURL = 'YOUR_N8N_WEBHOOK_URL_HERE';
-        
-        // Send to n8n
+    // TODO: Replace with your n8n webhook URL
+    const webhookURL = 'YOUR_N8N_WEBHOOK_URL_HERE';
+    
+    // Send to n8n in background (non-blocking)
+    if (webhookURL !== 'YOUR_N8N_WEBHOOK_URL_HERE') {
         fetch(webhookURL, {
             method: 'POST',
             headers: {
@@ -1205,16 +1520,10 @@ function submitOrder() {
         .then(response => response.json())
         .then(data => {
             console.log('Order submitted successfully:', data);
-            closeConfirmModal();
-            showThankYouPage();
         })
         .catch(error => {
             console.error('Error submitting order:', error);
-            alert('There was an error submitting your order. Please try again.');
-            
-            // Restore button state
-            submitBtn.textContent = originalText;
-            submitBtn.disabled = false;
+            // Don't show error to user since they already see thank you page
         });
     }
 }
@@ -1238,7 +1547,8 @@ function buildOrderData() {
         estimatedTotal: pricing.finalPrice,
         discount: pricing.discount,
         totalCanvases: pricing.totalCanvases,
-        orderTimestamp: new Date().toISOString()
+        orderTimestamp: new Date().toISOString(),
+        language: window.translations?.getCurrentLanguage ? window.translations.getCurrentLanguage() : 'en'
     };
     
     // Add canvas data
@@ -1288,6 +1598,13 @@ function showThankYouPage() {
     const thankYouPage = document.getElementById('thankYouPage');
     if (thankYouPage) {
         thankYouPage.style.display = 'flex';
+        document.querySelector('.container').setAttribute('aria-hidden', 'true');
+        
+        // Focus the new order button
+        const newOrderBtn = thankYouPage.querySelector('button');
+        if (newOrderBtn) {
+            setTimeout(() => newOrderBtn.focus(), 100);
+        }
     }
 }
 
@@ -1295,3 +1612,64 @@ function showThankYouPage() {
 function startNewOrder() {
     location.reload();
 }
+
+// Window resize handler for responsive canvas
+window.addEventListener('resize', function() {
+    updatePreview(currentCanvasIndex);
+});
+
+// Keyboard navigation for modals
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        // Close any open modals
+        if (document.getElementById('faqModal').style.display === 'block') {
+            closeFAQ();
+        } else if (document.getElementById('cropModal').style.display === 'block') {
+            cancelCrop();
+        } else if (document.getElementById('confirmModal').style.display === 'block') {
+            closeConfirmModal();
+        }
+    }
+});
+
+// Add screen reader only class for accessibility
+const srOnlyCSS = `
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+`;
+
+const style = document.createElement('style');
+style.textContent = srOnlyCSS;
+document.head.appendChild(style);
+
+// Export functions for global use
+window.canvasOrderForm = {
+    selectSize,
+    handleTwoPersonChange,
+    handleWelcomeHomeChange,
+    triggerFileInput,
+    handleImageUpload,
+    deleteImage,
+    updateCanvasCount,
+    switchCanvas,
+    handleCanvasTypeChange,
+    confirmOrder,
+    submitOrder,
+    startNewOrder,
+    openFAQ,
+    closeFAQ,
+    toggleFAQ,
+    applyCrop,
+    cancelCrop,
+    closeConfirmModal,
+    updatePreview
+};
