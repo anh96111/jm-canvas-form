@@ -12,17 +12,22 @@
         <!-- Header with Logo -->
         <header class="header">
             <img src="logo.png" alt="JM-Canvas" class="logo">
-            <h1>JM-Canvas Order Form</h1>
+            <h1>JM-Canvas</h1>
         </header>
 
         <!-- Promotional Banner -->
         <div class="promo-banner">
-            <div class="promo-text">
-                <span data-translate="promoText">🎁 Special Offer: Order 3+ canvas and get 5% OFF! Order 5+ canvas and get 12% OFF! 🎁</span>
+            <div class="promo-track">
+                <div class="promo-text">
+                    <span data-translate="promoText">🎁 Special Offer: Order 3+ canvas and get 5% OFF! Order 5+ canvas and get 12% OFF! 🎁</span>
+                </div>
+                <div class="promo-text">
+                    <span data-translate="promoText">🎁 Special Offer: Order 3+ canvas and get 5% OFF! Order 5+ canvas and get 12% OFF! 🎁</span>
+                </div>
             </div>
         </div>
 
-        <!-- Main Content Container (2-column layout) -->
+        <!-- Main Content Container -->
         <div class="main-content">
             <!-- Form Container -->
             <div class="form-container">
@@ -31,10 +36,10 @@
                 <div class="form-section">
                     <div class="section-header">
                         <h2 data-translate="canvasType">Select Canvas Type</h2>
-                        <button class="faq-button" onclick="openFAQ()" data-translate="faqButton">❓ FAQ</button>
+                        <button class="faq-button" onclick="openFAQ()" data-translate="faqButton">?</button>
                     </div>
                     <div class="form-group">
-                        <select id="canvasType" onchange="handleCanvasTypeChange()">
+                        <select id="canvasType" class="enhanced-select" onchange="handleCanvasTypeChange()">
                             <option value="single" data-translate="singleCanvas">Single Canvas</option>
                             <option value="multi" data-translate="multiCanvas">Multiple Different Canvas</option>
                             <option value="collage" data-translate="collageCanvas">Collage Multiple Images</option>
@@ -45,7 +50,7 @@
                     <div id="multiCanvasSection" style="display: none;">
                         <div class="form-group">
                             <label data-translate="selectQuantity">How many different canvas?</label>
-                            <select id="canvasQuantity" onchange="updateCanvasCount()">
+                            <select id="canvasQuantity" class="enhanced-select" onchange="updateCanvasCount()">
                                 <option value="2">2 Canvas</option>
                                 <option value="3">3 Canvas</option>
                                 <option value="4">4 Canvas</option>
@@ -72,28 +77,25 @@
                 <!-- Canvas Items Container -->
                 <div id="canvasItemsContainer" class="canvas-items-container">
                     
-                    <!-- Size Selection (2x2 Grid) -->
+                    <!-- Size Selection -->
                     <div class="form-section canvas-item" data-canvas="0">
                         <h2 data-translate="selectSize">Select Size *</h2>
                         <div class="size-grid">
                             <div class="size-option" data-size="8x10" onclick="selectSize('8x10', 0)">
-                                <div class="size-label">8x10"</div>
-                                <div class="size-price" data-base-price="34">$34</div>
+                                <div class="size-display">8x10 inches</div>
                             </div>
                             <div class="size-option" data-size="11x14" onclick="selectSize('11x14', 0)">
-                                <div class="size-label">11x14"</div>
-                                <div class="size-price" data-base-price="43">$43</div>
+                                <div class="size-display">11x14 inches</div>
                                 <div class="best-seller" data-translate="bestSeller">Best Seller</div>
                             </div>
                             <div class="size-option" data-size="16x20" onclick="selectSize('16x20', 0)">
-                                <div class="size-label">16x20"</div>
-                                <div class="size-price" data-base-price="62">$62</div>
+                                <div class="size-display">16x20 inches</div>
                             </div>
                             <div class="size-option" data-size="20x30" onclick="selectSize('20x30', 0)">
-                                <div class="size-label">20x30"</div>
-                                <div class="size-price" data-base-price="82">$82</div>
+                                <div class="size-display">20x30 inches</div>
                             </div>
                         </div>
+                        <div class="selected-price" id="selectedPrice-0" style="display: none;"></div>
                         <div class="validation-error" id="size-error-0"></div>
                     </div>
 
@@ -114,7 +116,7 @@
                                 <div class="upload-text" data-translate="uploadText">Click to upload images (Max 6)</div>
                                 <div class="upload-subtext" data-translate="uploadSubtext">Supports JPG, PNG - Will be cropped to 8:10 ratio</div>
                             </div>
-                            <input type="file" id="imageInput-0" multiple accept="image/*" style="display: none;" onchange="handleImageUpload(event, 0)">
+                            <input type="file" id="imageInput-0" multiple accept="image/jpeg,image/jpg,image/png" style="display: none;" onchange="handleImageUpload(event, 0)">
                             
                             <!-- Image Thumbnails -->
                             <div class="image-thumbnails" id="imageThumbnails-0">
@@ -128,7 +130,10 @@
                     <div class="form-section canvas-item" data-canvas="0">
                         <div class="form-group">
                             <label data-translate="customText">Enter your text</label>
-                            <input type="text" id="customText-0" placeholder="e.g., Forever Together" onkeyup="updatePreview(0)" data-translate-placeholder="customTextPlaceholder">
+                            <input type="text" id="customText-0" maxlength="50" placeholder="e.g., Forever Together" data-translate-placeholder="customTextPlaceholder">
+                            <div class="char-counter">
+                                <span id="charCount-0">0</span>/50
+                            </div>
                         </div>
                     </div>
 
@@ -136,18 +141,33 @@
                     <div class="form-section canvas-item" data-canvas="0">
                         <div class="form-group">
                             <label data-translate="date">Date</label>
-                            <input type="text" id="date-0" placeholder="e.g., Dec 25, 2024" onkeyup="updatePreview(0)" data-translate-placeholder="datePlaceholder">
+                            <input type="text" id="date-0" placeholder="e.g., Dec 25, 2024" data-translate-placeholder="datePlaceholder">
                         </div>
                     </div>
 
                     <!-- Welcome Home -->
                     <div class="form-section canvas-item" data-canvas="0" id="welcomeHomeSection-0">
                         <div class="checkbox-wrapper">
-                            <input type="checkbox" id="welcomeHome-0" onchange="handleWelcomeHomeChange(0)">
+                            <input type="checkbox" id="welcomeHome-0">
                             <label for="welcomeHome-0" data-translate="welcomeHome">Welcome Home</label>
                         </div>
                     </div>
 
+                    <!-- Preview Button -->
+                    <div class="form-section canvas-item preview-button-section" data-canvas="0">
+                        <button class="preview-btn" onclick="openPreviewModal(0)" data-translate="previewButton">Preview Your Customize</button>
+                    </div>
+
+                </div>
+
+                <!-- Mini Canvas Navigator (for multi canvas) -->
+                <div id="miniCanvasNav" class="mini-canvas-nav" style="display: none;">
+                    <div class="mini-nav-container">
+                        <span class="canvas-counter">Canvas <span id="currentCanvasNum">1</span>/<span id="totalCanvasNum">1</span></span>
+                        <div class="mini-tabs" id="miniTabs">
+                            <!-- Mini tabs will be generated here -->
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Notes Section -->
@@ -158,7 +178,7 @@
                     </div>
                 </div>
 
-                <!-- Customer Info (moved to bottom) -->
+                <!-- Customer Info -->
                 <div class="form-section">
                     <h2 data-translate="customerInfo">Customer Information</h2>
                     <div class="form-group">
@@ -181,17 +201,6 @@
 
                 <!-- Submit Button -->
                 <button class="submit-btn" onclick="confirmOrder()" data-translate="submit">Submit Order</button>
-            </div>
-
-            <!-- Preview Section (Sticky) -->
-            <div class="preview-section" id="previewSection">
-                <h2 data-translate="preview">Canvas Preview</h2>
-                <div class="preview-container">
-                    <canvas id="previewCanvas" width="400" height="500"></canvas>
-                    <div class="preview-notice" data-translate="previewNotice">
-                        This is only a preview for your custom text. The final canvas preview will be sent to your email and Messenger.
-                    </div>
-                </div>
             </div>
         </div>
     </div>
@@ -263,7 +272,7 @@
 
     <!-- Crop Modal -->
     <div id="cropModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content crop-modal-content">
             <h3 data-translate="cropImage">Crop Your Image</h3>
             <div class="crop-container">
                 <img id="cropImage" style="max-width: 100%;">
@@ -271,6 +280,19 @@
             <div class="crop-buttons">
                 <button onclick="cancelCrop()" data-translate="cancel">Cancel</button>
                 <button onclick="applyCrop()" class="primary-btn" data-translate="apply">Apply Crop</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Preview Modal -->
+    <div id="previewModal" class="modal">
+        <div class="modal-content preview-modal-content">
+            <div class="modal-header">
+                <h3 data-translate="previewTitle">Canvas Preview</h3>
+                <span class="close" onclick="closePreviewModal()">&times;</span>
+            </div>
+            <div class="preview-container">
+                <canvas id="previewCanvas" width="400" height="500"></canvas>
             </div>
         </div>
     </div>

@@ -1,1297 +1,806 @@
-// Global Variables and Configuration
-let currentCanvasIndex = 0;
+// Global variables
+let currentLanguage = 'en';
 let canvasData = {};
+let currentCanvas = 0;
+let totalCanvases = 1;
 let cropper = null;
-let currentCropImageIndex = 0;
-let isPreviewSticky = false;
+let currentCropData = null;
 
-// Canvas Size Configuration with EXACT pricing as required
-const canvasSizes = {
-    "8x10": { price: 34, label: "8x10\" - $34" },
-    "11x14": { price: 43, label: "11x14\" - $43 (Best Seller)" },
-    "16x20": { price: 62, label: "16x20\" - $62" },
-    "20x30": { price: 82, label: "20x30\" - $82" }
+// Prices configuration
+const PRICES = {
+    '8x10': 34,
+    '11x14': 43,
+    '16x20': 62,
+    '20x30': 82,
+    'twoPerson': 10
 };
 
-// Background images (adjust paths if using different folder structure)
-const canvasImages = {
-    single: 'canvas-bg-single.jpg',
-    couple: 'canvas-bg-couple.jpg',
-    welcomeHome: 'welcome-home-overlay.png'
-};
-
-// Initialize when page loads
+// Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
-    initializeForm();
-    autoFillFacebookName();
-    setupEventListeners();
     initializeCanvas(0);
-    updatePreview(0);
-    loadFonts();
+    updateLanguage();
+    updateTotalPrice();
+    
+    // Add character counter listener
+    document.getElementById('customText-0').addEventListener('input', function(e) {
+        updateCharCounter(0);
+    });
 });
 
-// Load custom fonts
-function loadFonts() {
-    if (document.fonts) {
-        document.fonts.ready.then(() => {
-            console.log('Fonts loaded successfully');
-            updatePreview(currentCanvasIndex);
-        }).catch(err => {
-            console.warn('Font loading failed:', err);
-        });
+// Initialize canvas data
+function initializeCanvas(canvasIndex) {
+    if (!canvasData[canvasIndex]) {
+        canvasData[canvasIndex] = {
+            size: null,
+            price: 0,
+            images: [],
+            customText: '',
+            date: '',
+            welcomeHome: false,
+            twoPerson: false
+        };
     }
-}
-
-// Auto-fill Facebook name from URL parameter
-function autoFillFacebookName() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const fbName = urlParams.get('fbName') || urlParams.get('name');
-    
-    if (fbName) {
-        const fbNameInput = document.getElementById('fbName');
-        if (fbNameInput) {
-            fbNameInput.value = decodeURIComponent(fbName);
-            // Clear validation error if exists
-            const errorElement = document.getElementById('fbName-error');
-            if (errorElement) {
-                errorElement.classList.remove('show');
-            }
-        }
-    }
-}
-
-// Initialize form with default values
-function initializeForm() {
-    // Initialize canvas data for first canvas
-    canvasData[0] = {
-        canvasType: 'single',
-        size: null,
-        basePrice: 0,
-        twoPersonCanvas: false,
-        images: [],
-        customText: '',
-        date: '',
-        welcomeHome: false,
-        totalPrice: 0
-    };
-    
-    // Set default canvas type
-    const canvasTypeSelect = document.getElementById('canvasType');
-    if (canvasTypeSelect) {
-        canvasTypeSelect.value = 'single';
-    }
-    
-    // Show appropriate sections
-    showCanvasTypeSections('single');
-    
-    // Initialize preview canvas
-    loadBackgroundImage('single');
-}
-
-// Setup event listeners
-function setupEventListeners() {
-    // Real-time validation
-    const fbNameInput = document.getElementById('fbName');
-    const emailInput = document.getElementById('email');
-    
-    if (fbNameInput) fbNameInput.addEventListener('input', validateFacebookName);
-    if (emailInput) emailInput.addEventListener('input', validateEmail);
-    
-    // Close modals when clicking outside
-    const faqModal = document.getElementById('faqModal');
-    const cropModal = document.getElementById('cropModal');
-    const confirmModal = document.getElementById('confirmModal');
-    
-    if (faqModal) {
-        faqModal.addEventListener('click', function(e) {
-            if (e.target === this) closeFAQ();
-        });
-    }
-    
-    if (cropModal) {
-        cropModal.addEventListener('click', function(e) {
-            if (e.target === this) cancelCrop();
-        });
-    }
-    
-    if (confirmModal) {
-        confirmModal.addEventListener('click', function(e) {
-            if (e.target === this) closeConfirmModal();
-        });
-    }
-    
-    // Scroll event for sticky preview
-    window.addEventListener('scroll', handleStickyPreview);
-    
-    // Focus events for text inputs to trigger sticky behavior
-    document.addEventListener('focusin', function(e) {
-        if (e.target.id && (e.target.id.includes('customText') || e.target.id.includes('date'))) {
-            enableStickyPreview();
-        }
-    });
 }
 
 // Handle canvas type change
 function handleCanvasTypeChange() {
     const canvasType = document.getElementById('canvasType').value;
-    
-    // Reset current canvas data
-    canvasData[currentCanvasIndex] = {
-        canvasType: canvasType,
-        size: null,
-        basePrice: 0,
-        twoPersonCanvas: false,
-        images: [],
-        customText: '',
-        date: '',
-        welcomeHome: false,
-        totalPrice: 0
-    };
-    
-    // Clear form inputs
-    clearFormInputs();
-    
-    // Show appropriate sections
-    showCanvasTypeSections(canvasType);
-    
-    // Update preview
-    loadBackgroundImage(canvasType === 'single' ? 'single' : 'single');
-    updatePreview(currentCanvasIndex);
-    updatePricing();
-}
-
-// Show/hide sections based on canvas type
-function showCanvasTypeSections(canvasType) {
-    const multiCanvasSection = document.getElementById('multiCanvasSection');
+    const multiSection = document.getElementById('multiCanvasSection');
     const canvasTabs = document.getElementById('canvasTabs');
-    const welcomeHomeSections = document.querySelectorAll('[id^="welcomeHomeSection-"]');
-    const twoPersonSections = document.querySelectorAll('[id^="twoPersonSection-"]');
-    const previewSection = document.getElementById('previewSection');
+    const miniNav = document.getElementById('miniCanvasNav');
     
     if (canvasType === 'multi') {
-        if (multiCanvasSection) multiCanvasSection.style.display = 'block';
-        if (canvasTabs) canvasTabs.style.display = 'flex';
-        welcomeHomeSections.forEach(section => section.style.display = 'block');
-        twoPersonSections.forEach(section => section.style.display = 'block');
-        if (previewSection) previewSection.classList.remove('collage-mode');
-    } else if (canvasType === 'collage') {
-        if (multiCanvasSection) multiCanvasSection.style.display = 'none';
-        if (canvasTabs) canvasTabs.style.display = 'none';
-        welcomeHomeSections.forEach(section => section.style.display = 'none');
-        twoPersonSections.forEach(section => section.style.display = 'none');
-        if (previewSection) previewSection.classList.add('collage-mode');
+        multiSection.style.display = 'block';
+        canvasTabs.style.display = 'flex';
+        miniNav.style.display = 'block';
+        updateCanvasCount();
     } else {
-        if (multiCanvasSection) multiCanvasSection.style.display = 'none';
-        if (canvasTabs) canvasTabs.style.display = 'none';
-        welcomeHomeSections.forEach(section => section.style.display = 'block');
-        twoPersonSections.forEach(section => section.style.display = 'block');
-        if (previewSection) previewSection.classList.remove('collage-mode');
+        multiSection.style.display = 'none';
+        canvasTabs.style.display = 'none';
+        miniNav.style.display = 'none';
+        totalCanvases = 1;
+        
+        // Keep canvas 1 data when switching back to single
+        const tempData = canvasData[0];
+        canvasData = { 0: tempData || {} };
+        initializeCanvas(0);
     }
 }
 
-// Update canvas count for multi-canvas
+// Update canvas count for multi canvas
 function updateCanvasCount() {
     const quantity = parseInt(document.getElementById('canvasQuantity').value);
-    const tabsContainer = document.getElementById('canvasTabs');
-    const itemsContainer = document.getElementById('canvasItemsContainer');
+    totalCanvases = quantity;
     
-    // Clear existing tabs and items
-    if (tabsContainer) tabsContainer.innerHTML = '';
-    if (itemsContainer) itemsContainer.innerHTML = '';
+    // Update discount notification
+    const discountNotification = document.getElementById('discountNotification');
+    const discountText = document.querySelector('.discount-text');
     
-    // Create new tabs and canvas items
-    for (let i = 0; i < quantity; i++) {
-        createCanvasTab(i);
-        createCanvasItem(i);
-        
-        // Initialize canvas data
-        canvasData[i] = {
-            canvasType: 'multi',
-            size: null,
-            basePrice: 0,
-            twoPersonCanvas: false,
-            images: [],
-            customText: '',
-            date: '',
-            welcomeHome: false,
-            totalPrice: 0
-        };
+    if (quantity >= 5) {
+        discountNotification.style.display = 'block';
+        discountText.textContent = 'You qualify for 12% discount!';
+    } else if (quantity >= 3) {
+        discountNotification.style.display = 'block';
+        discountText.textContent = 'You qualify for 5% discount!';
+    } else {
+        discountNotification.style.display = 'none';
     }
     
-    // Show first canvas
-    switchCanvas(0);
+    // Generate tabs
+    generateCanvasTabs();
+    generateMiniTabs();
     
-    // Show discount notification
-    showDiscountNotification(quantity);
+    // Initialize new canvases
+    for (let i = 0; i < quantity; i++) {
+        initializeCanvas(i);
+        if (i > 0) {
+            duplicateCanvasElements(i);
+        }
+    }
+    
+    // Remove extra canvases
+    for (let i = quantity; i < 10; i++) {
+        removeCanvasElements(i);
+        delete canvasData[i];
+    }
+    
+    updateTotalPrice();
 }
 
-// Create canvas tab
-function createCanvasTab(index) {
+// Generate canvas tabs
+function generateCanvasTabs() {
     const tabsContainer = document.getElementById('canvasTabs');
-    if (!tabsContainer) return;
+    tabsContainer.innerHTML = '';
     
-    const tab = document.createElement('div');
-    tab.className = index === 0 ? 'tab active' : 'tab';
-    tab.textContent = `Canvas ${index + 1}`;
-    tab.onclick = () => switchCanvas(index);
-    tabsContainer.appendChild(tab);
+    for (let i = 0; i < totalCanvases; i++) {
+        const tab = document.createElement('div');
+        tab.className = 'tab' + (i === currentCanvas ? ' active' : '');
+        tab.textContent = `Canvas ${i + 1}`;
+        tab.onclick = () => switchCanvas(i);
+        tabsContainer.appendChild(tab);
+    }
 }
 
-// Create canvas item
-function createCanvasItem(index) {
-    const itemsContainer = document.getElementById('canvasItemsContainer');
-    if (!itemsContainer) return;
+// Generate mini tabs for bottom navigation
+function generateMiniTabs() {
+    const miniTabsContainer = document.getElementById('miniTabs');
+    miniTabsContainer.innerHTML = '';
     
-    const canvasItem = document.createElement('div');
-    canvasItem.className = 'canvas-item';
-    canvasItem.setAttribute('data-canvas', index);
-    canvasItem.style.display = index === 0 ? 'block' : 'none';
+    // Show 2-3 tabs around current
+    let start = Math.max(0, currentCanvas - 1);
+    let end = Math.min(totalCanvases - 1, start + 2);
     
-    canvasItem.innerHTML = `
-        <!-- Size Selection -->
-        <div class="form-section">
-            <h2 data-translate="selectSize">Select Size *</h2>
-            <div class="size-grid">
-                <div class="size-option" data-size="8x10" onclick="selectSize('8x10', ${index})">
-                    <div class="size-label">8x10"</div>
-                    <div class="size-price" data-base-price="34">$34</div>
-                </div>
-                <div class="size-option" data-size="11x14" onclick="selectSize('11x14', ${index})">
-                    <div class="size-label">11x14"</div>
-                    <div class="size-price" data-base-price="43">$43</div>
-                    <div class="best-seller" data-translate="bestSeller">Best Seller</div>
-                </div>
-                <div class="size-option" data-size="16x20" onclick="selectSize('16x20', ${index})">
-                    <div class="size-label">16x20"</div>
-                    <div class="size-price" data-base-price="62">$62</div>
-                </div>
-                <div class="size-option" data-size="20x30" onclick="selectSize('20x30', ${index})">
-                    <div class="size-label">20x30"</div>
-                    <div class="size-price" data-base-price="82">$82</div>
-                </div>
-            </div>
-            <div class="validation-error" id="size-error-${index}"></div>
-        </div>
-
-        <!-- Two Person Canvas Checkbox -->
-        <div class="form-section" id="twoPersonSection-${index}">
-            <div class="checkbox-wrapper">
-                <input type="checkbox" id="twoPersonCanvas-${index}" onchange="handleTwoPersonChange(${index})">
-                <label for="twoPersonCanvas-${index}" data-translate="twoPersonLabel">2 people on 1 canvas (+$10)</label>
-            </div>
-        </div>
-
-        <!-- Image Upload -->
-        <div class="form-section">
-            <h2 data-translate="uploadImages">Upload Images *</h2>
-            <div class="upload-container">
-                <div class="upload-area" onclick="triggerFileInput(${index})">
-                    <div class="upload-icon">📷</div>
-                    <div class="upload-text" data-translate="uploadText">Click to upload images (Max 6)</div>
-                    <div class="upload-subtext" data-translate="uploadSubtext">Supports JPG, PNG - Will be cropped to 8:10 ratio</div>
-                </div>
-                <input type="file" id="imageInput-${index}" multiple accept="image/*" style="display: none;" onchange="handleImageUpload(event, ${index})">
-                <div class="image-thumbnails" id="imageThumbnails-${index}"></div>
-            </div>
-            <div class="validation-error" id="image-error-${index}"></div>
-        </div>
-
-        <!-- Custom Text -->
-        <div class="form-section">
-            <div class="form-group">
-                <label data-translate="customText">Enter your text</label>
-                <input type="text" id="customText-${index}" placeholder="e.g., Forever Together" onkeyup="updatePreview(${index})" data-translate-placeholder="customTextPlaceholder">
-            </div>
-        </div>
-
-        <!-- Date -->
-        <div class="form-section">
-            <div class="form-group">
-                <label data-translate="date">Date</label>
-                <input type="text" id="date-${index}" placeholder="e.g., Dec 25, 2024" onkeyup="updatePreview(${index})" data-translate-placeholder="datePlaceholder">
-            </div>
-        </div>
-
-        <!-- Welcome Home -->
-        <div class="form-section" id="welcomeHomeSection-${index}">
-            <div class="checkbox-wrapper">
-                <input type="checkbox" id="welcomeHome-${index}" onchange="handleWelcomeHomeChange(${index})">
-                <label for="welcomeHome-${index}" data-translate="welcomeHome">Welcome Home</label>
-            </div>
-        </div>
-    `;
+    if (end - start < 2 && totalCanvases > 2) {
+        start = Math.max(0, end - 2);
+    }
     
-    itemsContainer.appendChild(canvasItem);
+    for (let i = start; i <= end; i++) {
+        const tab = document.createElement('div');
+        tab.className = 'mini-tab' + (i === currentCanvas ? ' active' : '');
+        tab.textContent = `Canvas ${i + 1}`;
+        tab.onclick = () => switchCanvas(i);
+        miniTabsContainer.appendChild(tab);
+    }
+    
+    // Update counter
+    document.getElementById('currentCanvasNum').textContent = currentCanvas + 1;
+    document.getElementById('totalCanvasNum').textContent = totalCanvases;
 }
 
-// Switch between canvas tabs
+// Switch between canvases
 function switchCanvas(index) {
-    currentCanvasIndex = index;
+    // Save current canvas data
+    saveCurrentCanvasData();
     
-    // Update tab active state
-    document.querySelectorAll('.tab').forEach((tab, i) => {
+    // Hide current canvas elements
+    document.querySelectorAll(`.canvas-item[data-canvas="${currentCanvas}"]`).forEach(el => {
+        el.style.display = 'none';
+    });
+    
+    // Show new canvas elements
+    document.querySelectorAll(`.canvas-item[data-canvas="${index}"]`).forEach(el => {
+        el.style.display = 'block';
+    });
+    
+    // Update active tab
+    document.querySelectorAll('.canvas-tabs .tab').forEach((tab, i) => {
         tab.classList.toggle('active', i === index);
     });
     
-    // Show/hide canvas items
-    document.querySelectorAll('.canvas-item').forEach((item, i) => {
-        item.style.display = i === index ? 'block' : 'none';
-    });
+    currentCanvas = index;
     
-    // Update preview
-    updatePreview(index);
-    updatePricing();
+    // Update mini tabs
+    generateMiniTabs();
+    
+    // Load canvas data
+    loadCanvasData(index);
 }
 
-// Select canvas size
+// Save current canvas data
+function saveCurrentCanvasData() {
+    const data = canvasData[currentCanvas];
+    data.customText = document.getElementById(`customText-${currentCanvas}`).value;
+    data.date = document.getElementById(`date-${currentCanvas}`).value;
+    data.welcomeHome = document.getElementById(`welcomeHome-${currentCanvas}`).checked;
+    data.twoPerson = document.getElementById(`twoPersonCanvas-${currentCanvas}`).checked;
+}
+
+// Load canvas data
+function loadCanvasData(index) {
+    const data = canvasData[index];
+    if (!data) return;
+    
+    document.getElementById(`customText-${index}`).value = data.customText || '';
+    document.getElementById(`date-${index}`).value = data.date || '';
+    document.getElementById(`welcomeHome-${index}`).checked = data.welcomeHome || false;
+    document.getElementById(`twoPersonCanvas-${index}`).checked = data.twoPerson || false;
+    
+    updateCharCounter(index);
+}
+
+// Duplicate canvas elements for multi canvas
+function duplicateCanvasElements(index) {
+    const container = document.getElementById('canvasItemsContainer');
+    const originalElements = document.querySelectorAll('.canvas-item[data-canvas="0"]');
+    
+    originalElements.forEach(element => {
+        const clone = element.cloneNode(true);
+        clone.setAttribute('data-canvas', index);
+        clone.style.display = 'none';
+        
+        // Update IDs and attributes
+        clone.querySelectorAll('[id]').forEach(el => {
+            const oldId = el.id;
+            const newId = oldId.replace('-0', `-${index}`);
+            el.id = newId;
+            
+            // Update onchange/onclick attributes
+            if (el.hasAttribute('onchange')) {
+                el.setAttribute('onchange', el.getAttribute('onchange').replace('(0)', `(${index})`));
+            }
+            if (el.hasAttribute('onclick')) {
+                el.setAttribute('onclick', el.getAttribute('onclick').replace('(0)', `(${index})`));
+            }
+        });
+        
+        // Update labels
+        clone.querySelectorAll('label[for]').forEach(label => {
+            const forAttr = label.getAttribute('for');
+            label.setAttribute('for', forAttr.replace('-0', `-${index}`));
+        });
+        
+        // Clear values
+        clone.querySelectorAll('input[type="text"], input[type="email"], textarea').forEach(input => {
+            input.value = '';
+        });
+        clone.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.checked = false;
+        });
+        
+        container.appendChild(clone);
+    });
+    
+    // Add character counter listener
+    document.getElementById(`customText-${index}`).addEventListener('input', function(e) {
+        updateCharCounter(index);
+    });
+}
+
+// Remove canvas elements
+function removeCanvasElements(index) {
+    document.querySelectorAll(`.canvas-item[data-canvas="${index}"]`).forEach(el => {
+        el.remove();
+    });
+}
+
+// Select size
 function selectSize(size, canvasIndex) {
-    // Remove previous selection
-    document.querySelectorAll(`[data-canvas="${canvasIndex}"] .size-option`).forEach(option => {
+    // Update UI
+    document.querySelectorAll(`.canvas-item[data-canvas="${canvasIndex}"] .size-option`).forEach(option => {
         option.classList.remove('selected');
     });
     
-    // Add selection to clicked option
-    const selectedOption = document.querySelector(`[data-canvas="${canvasIndex}"] .size-option[data-size="${size}"]`);
-    if (selectedOption) {
-        selectedOption.classList.add('selected');
-    }
+    document.querySelector(`.canvas-item[data-canvas="${canvasIndex}"] .size-option[data-size="${size}"]`).classList.add('selected');
     
-    // Update canvas data
-    if (!canvasData[canvasIndex]) {
-        canvasData[canvasIndex] = {};
-    }
+    // Update price display
+    const priceDisplay = document.getElementById(`selectedPrice-${canvasIndex}`);
+    const price = PRICES[size];
+    priceDisplay.textContent = `$${price}`;
+    priceDisplay.style.display = 'block';
+    priceDisplay.classList.add('show');
+    
+    // Update data
     canvasData[canvasIndex].size = size;
-    canvasData[canvasIndex].basePrice = canvasSizes[size].price;
+    canvasData[canvasIndex].price = price;
     
-    // Clear size validation error
+    // Clear validation error
     const errorElement = document.getElementById(`size-error-${canvasIndex}`);
-    if (errorElement) {
-        errorElement.classList.remove('show');
-    }
+    errorElement.textContent = '';
+    errorElement.classList.remove('show');
     
-    // Update pricing
-    updatePricing();
+    updateTotalPrice();
 }
 
-// Handle two person canvas change
+// Handle two person change
 function handleTwoPersonChange(canvasIndex) {
-    const checkbox = document.getElementById(`twoPersonCanvas-${canvasIndex}`);
-    const isChecked = checkbox ? checkbox.checked : false;
-    
-    // Update canvas data
-    if (!canvasData[canvasIndex]) {
-        canvasData[canvasIndex] = {};
-    }
-    canvasData[canvasIndex].twoPersonCanvas = isChecked;
-    
-    // Update size prices display
-    updateSizePrices(canvasIndex, isChecked);
-    
-    // Update background image
-    const canvasType = document.getElementById('canvasType').value;
-    if (canvasType === 'single' || canvasType === 'multi') {
-        loadBackgroundImage(isChecked ? 'couple' : 'single');
-    }
-    
-    // Update pricing
-    updatePricing();
+    const isChecked = document.getElementById(`twoPersonCanvas-${canvasIndex}`).checked;
+    canvasData[canvasIndex].twoPerson = isChecked;
+    updateTotalPrice();
 }
 
-// Update size prices display
-function updateSizePrices(canvasIndex, addTenDollars) {
-    const sizeOptions = document.querySelectorAll(`[data-canvas="${canvasIndex}"] .size-option`);
-    
-    sizeOptions.forEach(option => {
-        const priceElement = option.querySelector('.size-price');
-        const basePrice = parseInt(priceElement.getAttribute('data-base-price'));
-        const newPrice = addTenDollars ? basePrice + 10 : basePrice;
-        priceElement.textContent = `$${newPrice}`;
-    });
+// Update character counter
+function updateCharCounter(canvasIndex) {
+    const input = document.getElementById(`customText-${canvasIndex}`);
+    const counter = document.getElementById(`charCount-${canvasIndex}`);
+    if (counter) {
+        counter.textContent = input.value.length;
+    }
 }
 
 // Trigger file input
 function triggerFileInput(canvasIndex) {
-    const fileInput = document.getElementById(`imageInput-${canvasIndex}`);
-    if (fileInput) {
-        fileInput.click();
-    }
+    document.getElementById(`imageInput-${canvasIndex}`).click();
 }
 
 // Handle image upload
 function handleImageUpload(event, canvasIndex) {
     const files = Array.from(event.target.files);
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    const maxImages = 6;
     
-    if (files.length === 0) return;
+    // Clear validation error
+    const errorElement = document.getElementById(`image-error-${canvasIndex}`);
+    errorElement.textContent = '';
+    errorElement.classList.remove('show');
     
-    // Check max limit
-    const currentImages = canvasData[canvasIndex]?.images || [];
-    const totalImages = currentImages.length + files.length;
-    
-    if (totalImages > 6) {
-        alert('Maximum 6 images allowed per canvas');
+    // Check current image count
+    if (canvasData[canvasIndex].images.length >= maxImages) {
+        errorElement.textContent = `Maximum ${maxImages} images allowed`;
+        errorElement.classList.add('show');
         return;
     }
     
-    // Process each file
-    files.forEach(file => {
-        if (file.type.startsWith('image/')) {
-            processImageFile(file, canvasIndex);
+    // Validate files
+    const validFiles = files.filter(file => {
+        if (!validTypes.includes(file.type)) {
+            errorElement.textContent = 'Only JPG and PNG files are allowed';
+            errorElement.classList.add('show');
+            return false;
+        }
+        return true;
+    });
+    
+    // Process valid files
+    validFiles.forEach(file => {
+        if (canvasData[canvasIndex].images.length < maxImages) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                // Open crop modal
+                openCropModal(e.target.result, canvasIndex);
+            };
+            reader.readAsDataURL(file);
         }
     });
     
-    // Clear file input
+    // Clear input
     event.target.value = '';
 }
 
-// Process image file
-function processImageFile(file, canvasIndex) {
-    const reader = new FileReader();
+// Open crop modal
+function openCropModal(imageSrc, canvasIndex) {
+    const modal = document.getElementById('cropModal');
+    const image = document.getElementById('cropImage');
     
-    reader.onload = function(e) {
-        // Show crop modal
-        const cropModal = document.getElementById('cropModal');
-        const cropImage = document.getElementById('cropImage');
-        
-        if (cropImage) {
-            cropImage.src = e.target.result;
-        }
-        if (cropModal) {
-            cropModal.style.display = 'block';
-        }
-        
-        // Initialize cropper with 8:10 ratio
-        setTimeout(() => {
-            if (cropper) {
-                cropper.destroy();
-            }
-            
-            if (cropImage) {
-                cropper = new Cropper(cropImage, {
-                    aspectRatio: 8 / 10,
-                    viewMode: 1,
-                    autoCropArea: 1,
-                    responsive: true,
-                    background: false,
-                    checkOrientation: false
-                });
-            }
-            
-            // Store current context
-            currentCropImageIndex = canvasIndex;
-        }, 100);
+    currentCropData = {
+        canvasIndex: canvasIndex,
+        originalSrc: imageSrc
     };
     
-    reader.readAsDataURL(file);
-}
-
-// Apply crop
-function applyCrop() {
-    if (!cropper) return;
+    image.src = imageSrc;
+    modal.style.display = 'block';
     
-    const canvas = cropper.getCroppedCanvas({
-        width: 400,
-        height: 500,
-        imageSmoothingEnabled: true,
-        imageSmoothingQuality: 'high'
+    // Initialize cropper
+    if (cropper) {
+        cropper.destroy();
+    }
+    
+    cropper = new Cropper(image, {
+        aspectRatio: 8 / 10,
+        viewMode: 1,
+        guides: true,
+        center: true,
+        highlight: true,
+        background: true,
+        autoCrop: true,
+        autoCropArea: 0.8,
+        movable: true,
+        rotatable: true,
+        scalable: true,
+        zoomable: true,
+        zoomOnTouch: true,
+        zoomOnWheel: true,
+        cropBoxMovable: true,
+        cropBoxResizable: true,
+        toggleDragModeOnDblclick: true
     });
-    
-    const croppedImageData = canvas.toDataURL('image/jpeg', 0.9);
-    
-    // Add to canvas data
-    if (!canvasData[currentCropImageIndex]) {
-        canvasData[currentCropImageIndex] = { images: [] };
-    }
-    if (!canvasData[currentCropImageIndex].images) {
-        canvasData[currentCropImageIndex].images = [];
-    }
-    
-    canvasData[currentCropImageIndex].images.push({
-        data: croppedImageData,
-        id: Date.now() + Math.random()
-    });
-    
-    // Update thumbnails
-    updateImageThumbnails(currentCropImageIndex);
-    
-    // Clear image validation error
-    const errorElement = document.getElementById(`image-error-${currentCropImageIndex}`);
-    if (errorElement) {
-        errorElement.classList.remove('show');
-    }
-    
-    // Update preview
-    updatePreview(currentCropImageIndex);
-    
-    // Close crop modal
-    cancelCrop();
 }
 
 // Cancel crop
 function cancelCrop() {
-    const cropModal = document.getElementById('cropModal');
-    if (cropModal) {
-        cropModal.style.display = 'none';
-    }
-    
     if (cropper) {
         cropper.destroy();
         cropper = null;
     }
+    document.getElementById('cropModal').style.display = 'none';
+    currentCropData = null;
+}
+
+// Apply crop
+function applyCrop() {
+    if (!cropper || !currentCropData) return;
+    
+    const canvas = cropper.getCroppedCanvas({
+        width: 400,
+        height: 500
+    });
+    
+    const croppedImage = canvas.toDataURL('image/jpeg', 0.9);
+    
+    // Add to canvas data
+    canvasData[currentCropData.canvasIndex].images.push(croppedImage);
+    
+    // Update thumbnails
+    updateImageThumbnails(currentCropData.canvasIndex);
+    
+    // Close modal
+    cancelCrop();
 }
 
 // Update image thumbnails
 function updateImageThumbnails(canvasIndex) {
     const container = document.getElementById(`imageThumbnails-${canvasIndex}`);
-    if (!container) return;
-    
-    const images = canvasData[canvasIndex]?.images || [];
-    
     container.innerHTML = '';
     
-    images.forEach((image, index) => {
-        const thumbnail = document.createElement('div');
-        thumbnail.className = 'image-thumbnail';
-        thumbnail.innerHTML = `
-            <img src="${image.data}" alt="Uploaded image">
-            <button class="delete-btn" onclick="deleteImage(${canvasIndex}, ${index})">×</button>
+    canvasData[canvasIndex].images.forEach((image, index) => {
+        const thumb = document.createElement('div');
+        thumb.className = 'image-thumb';
+        thumb.innerHTML = `
+            <img src="${image}" alt="Image ${index + 1}">
+            <button class="remove-image" onclick="removeImage(${canvasIndex}, ${index})">×</button>
         `;
-        container.appendChild(thumbnail);
+        container.appendChild(thumb);
     });
 }
 
-// Delete image
-function deleteImage(canvasIndex, imageIndex) {
-    if (canvasData[canvasIndex] && canvasData[canvasIndex].images) {
-        canvasData[canvasIndex].images.splice(imageIndex, 1);
-        updateImageThumbnails(canvasIndex);
-        updatePreview(canvasIndex);
-    }
+// Remove image
+function removeImage(canvasIndex, imageIndex) {
+    canvasData[canvasIndex].images.splice(imageIndex, 1);
+    updateImageThumbnails(canvasIndex);
 }
 
-// Load background image
-function loadBackgroundImage(type) {
+// Open preview modal
+function openPreviewModal(canvasIndex) {
+    const modal = document.getElementById('previewModal');
     const canvas = document.getElementById('previewCanvas');
-    if (!canvas) return;
-    
     const ctx = canvas.getContext('2d');
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
     
-    img.onload = function() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    // Clear canvas
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    
+    // Load background image
+    const bgImage = new Image();
+    const isTwoPerson = canvasData[canvasIndex].twoPerson;
+    bgImage.src = isTwoPerson ? 'canvas-bg-couple.jpg' : 'canvas-bg-single.jpg';
+    
+    bgImage.onload = function() {
+        // Draw background
+        ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
         
-        // Update preview with current text
-        updatePreview(currentCanvasIndex);
-    };
-    
-    img.onerror = function() {
-        console.error('Failed to load background image:', type);
-        // Fallback to solid color
-        ctx.fillStyle = '#f0f0f0';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        updatePreview(currentCanvasIndex);
-    };
-    
-    // Set image source
-    if (type === 'couple') {
-        img.src = canvasImages.couple;
-    } else if (type === 'single') {
-        img.src = canvasImages.single;
-    } else {
-        // Collage mode - white background
-        ctx.fillStyle = '#ffffff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        updatePreview(currentCanvasIndex);
-        return;
-    }
-}
-
-// Update preview canvas
-function updatePreview(canvasIndex) {
-    const canvas = document.getElementById('previewCanvas');
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    const canvasType = document.getElementById('canvasType').value;
-    
-    if (canvasType === 'collage') {
-        updateCollagePreview(canvasIndex);
-        return;
-    }
-    
-    // Get current canvas data
-    const currentData = canvasData[canvasIndex] || {};
-    const customTextInput = document.getElementById(`customText-${canvasIndex}`);
-    const dateInput = document.getElementById(`date-${canvasIndex}`);
-    const welcomeHomeInput = document.getElementById(`welcomeHome-${canvasIndex}`);
-    
-    const customText = customTextInput ? customTextInput.value : '';
-    const date = dateInput ? dateInput.value : '';
-    const welcomeHome = welcomeHomeInput ? welcomeHomeInput.checked : false;
-    
-    // Update canvas data
-    if (canvasData[canvasIndex]) {
-        canvasData[canvasIndex].customText = customText;
-        canvasData[canvasIndex].date = date;
-        canvasData[canvasIndex].welcomeHome = welcomeHome;
-    }
-    
-    // Reload background first
-    const bgType = currentData.twoPersonCanvas ? 'couple' : 'single';
-    const bgImg = new Image();
-    bgImg.crossOrigin = 'anonymous';
-    
-    bgImg.onload = function() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
+        // Draw preview notice in center
+        ctx.save();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fillRect(50, 200, 300, 100);
+        
+        ctx.fillStyle = '#333';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        
+        const notice = 'This is only a preview for your custom text.\nThe final canvas preview will be sent to\nyour email and Messenger.';
+        const lines = notice.split('\n');
+        lines.forEach((line, index) => {
+            ctx.fillText(line, 200, 230 + (index * 20));
+        });
+        ctx.restore();
         
         // Draw custom text
+        const customText = canvasData[canvasIndex].customText;
         if (customText) {
-            drawCustomText(ctx, customText, canvas.width, canvas.height);
+            ctx.save();
+            ctx.fillStyle = '#333';
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(customText, 200, 380);
+            ctx.restore();
         }
         
         // Draw date
+        const date = canvasData[canvasIndex].date;
         if (date) {
-            drawDate(ctx, date, canvas.width, canvas.height);
+            ctx.save();
+            ctx.fillStyle = '#666';
+            ctx.font = '18px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(date, 200, 420);
+            ctx.restore();
         }
         
-        // Draw Welcome Home overlay
-        if (welcomeHome) {
-            drawWelcomeHomeOverlay(ctx, canvas.width, canvas.height);
-        }
-    };
-    
-    bgImg.src = bgType === 'couple' ? canvasImages.couple : canvasImages.single;
-}
-
-// Update collage preview
-function updateCollagePreview(canvasIndex) {
-    const canvas = document.getElementById('previewCanvas');
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    const currentData = canvasData[canvasIndex] || {};
-    const images = currentData.images || [];
-    
-    // Set canvas size for collage mode
-    canvas.width = 500;
-    canvas.height = 400;
-    
-    // Clear canvas
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    // Draw images side by side
-    if (images.length > 0) {
-        const imageWidth = canvas.width / images.length;
-        
-        images.forEach((imageData, index) => {
-            const img = new Image();
-            img.onload = function() {
-                const x = index * imageWidth;
-                const y = 0;
-                ctx.drawImage(img, x, y, imageWidth, canvas.height);
-                
-                // Draw text overlay after all images
-                if (index === images.length - 1) {
-                    const customTextInput = document.getElementById(`customText-${canvasIndex}`);
-                    const dateInput = document.getElementById(`date-${canvasIndex}`);
-                    
-                    const customText = customTextInput ? customTextInput.value : '';
-                    const date = dateInput ? dateInput.value : '';
-                    
-                    if (customText) {
-                        drawCustomText(ctx, customText, canvas.width, canvas.height);
-                    }
-                    
-                    if (date) {
-                        drawDate(ctx, date, canvas.width, canvas.height);
-                    }
-                }
+        // Draw welcome home if selected
+        if (canvasData[canvasIndex].welcomeHome) {
+            const welcomeImg = new Image();
+            welcomeImg.src = 'welcome-home-overlay.png';
+            welcomeImg.onload = function() {
+                ctx.drawImage(welcomeImg, 100, 50, 200, 50);
             };
-            img.src = imageData.data;
-        });
-    }
-    
-    // If no images, just draw text
-    if (images.length === 0) {
-        const customTextInput = document.getElementById(`customText-${canvasIndex}`);
-        const dateInput = document.getElementById(`date-${canvasIndex}`);
-        
-        const customText = customTextInput ? customTextInput.value : '';
-        const date = dateInput ? dateInput.value : '';
-        
-        if (customText) {
-            drawCustomText(ctx, customText, canvas.width, canvas.height);
         }
-        
-        if (date) {
-            drawDate(ctx, date, canvas.width, canvas.height);
-        }
-    }
-}
-
-// Draw custom text with TextFont
-function drawCustomText(ctx, text, canvasWidth, canvasHeight) {
-    ctx.font = '32px "TextFont", serif';
-    ctx.fillStyle = '#000000';
-    ctx.strokeStyle = '#8B4513';
-    ctx.lineWidth = 1;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    const x = canvasWidth / 2;
-    const y = canvasHeight * 0.75; // 75% down from top
-    
-    // Draw text with stroke (border)
-    ctx.strokeText(text, x, y);
-    ctx.fillText(text, x, y);
-}
-
-// Draw date with DateFont
-function drawDate(ctx, date, canvasWidth, canvasHeight) {
-    ctx.font = '18px "DateFont", serif';
-    ctx.fillStyle = '#000000';
-    ctx.strokeStyle = '#8B4513';
-    ctx.lineWidth = 0.5;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    
-    const x = canvasWidth / 2;
-    const y = canvasHeight * 0.85; // 85% down from top
-    
-    // Draw date with stroke (border)
-    ctx.strokeText(date, x, y);
-    ctx.fillText(date, x, y);
-}
-
-// Draw Welcome Home overlay
-function drawWelcomeHomeOverlay(ctx, canvasWidth, canvasHeight) {
-    const welcomeImg = new Image();
-    welcomeImg.crossOrigin = 'anonymous';
-    
-    welcomeImg.onload = function() {
-        // Draw Welcome Home overlay (positioned like in your example)
-        const overlayWidth = canvasWidth * 0.4;
-        const overlayHeight = canvasHeight * 0.6;
-        const x = canvasWidth - overlayWidth - 20;
-        const y = 20;
-        
-        ctx.drawImage(welcomeImg, x, y, overlayWidth, overlayHeight);
     };
     
-    welcomeImg.src = canvasImages.welcomeHome;
+    modal.style.display = 'block';
 }
 
-// Handle Welcome Home change
-function handleWelcomeHomeChange(canvasIndex) {
-    const checkbox = document.getElementById(`welcomeHome-${canvasIndex}`);
-    const isChecked = checkbox ? checkbox.checked : false;
-    
-    // Update canvas data
-    if (!canvasData[canvasIndex]) {
-        canvasData[canvasIndex] = {};
-    }
-    canvasData[canvasIndex].welcomeHome = isChecked;
-    
-    // Update preview
-    updatePreview(canvasIndex);
-    
-    // Handle sticky behavior
-    if (isChecked) {
-        // Remove sticky when Welcome Home is selected
-        disableStickyPreview();
-    }
+// Close preview modal
+function closePreviewModal() {
+    document.getElementById('previewModal').style.display = 'none';
 }
 
-// Enable sticky preview
-function enableStickyPreview() {
-    const previewSection = document.getElementById('previewSection');
-    const welcomeHomeCheckbox = document.getElementById(`welcomeHome-${currentCanvasIndex}`);
+// Update total price
+function updateTotalPrice() {
+    let total = 0;
     
-    if (previewSection && (!welcomeHomeCheckbox || !welcomeHomeCheckbox.checked)) {
-        previewSection.classList.add('sticky');
-        previewSection.classList.remove('unsticky');
-        isPreviewSticky = true;
-    }
-}
-
-// Disable sticky preview
-function disableStickyPreview() {
-    const previewSection = document.getElementById('previewSection');
-    if (previewSection) {
-        previewSection.classList.remove('sticky');
-        previewSection.classList.add('unsticky');
-        isPreviewSticky = false;
-    }
-}
-
-// Handle sticky preview behavior
-function handleStickyPreview() {
-    // This function is called on scroll events
-    // The sticky behavior is primarily handled by CSS and focus events
-}
-
-// Initialize canvas
-function initializeCanvas(canvasIndex) {
-    const canvas = document.getElementById('previewCanvas');
-    if (!canvas) return;
-    
-    // Set canvas size
-    canvas.width = 400;
-    canvas.height = 500;
-    
-    // Load initial background
-    loadBackgroundImage('single');
-}
-
-// Show discount notification
-function showDiscountNotification(quantity) {
-    const notification = document.getElementById('discountNotification');
-    if (!notification) return;
-    
-    const textElement = notification.querySelector('.discount-text');
-    if (!textElement) return;
-    
-    if (quantity >= 5) {
-        textElement.textContent = 'Amazing! You get 12% OFF for ordering 5+ canvas!';
-        notification.style.display = 'block';
-    } else if (quantity >= 3) {
-        textElement.textContent = 'Great! You get 5% OFF for ordering 3+ canvas!';
-        notification.style.display = 'block';
-    } else {
-        notification.style.display = 'none';
-    }
-}
-
-// Update pricing
-function updatePricing() {
-    let totalPrice = 0;
-    let totalCanvases = 0;
-    
-    const canvasType = document.getElementById('canvasType').value;
-    
-    if (canvasType === 'multi') {
-        const quantitySelect = document.getElementById('canvasQuantity');
-        const quantity = quantitySelect ? parseInt(quantitySelect.value) : 1;
-        
-        for (let i = 0; i < quantity; i++) {
-            const canvas = canvasData[i];
-            if (canvas && canvas.size) {
-                let price = canvas.basePrice;
-                if (canvas.twoPersonCanvas) {
-                    price += 10;
-                }
-                canvas.totalPrice = price;
-                totalPrice += price;
-                totalCanvases++;
+    // Calculate base price for all canvases
+    for (let i = 0; i < totalCanvases; i++) {
+        if (canvasData[i]) {
+            total += canvasData[i].price || 0;
+            if (canvasData[i].twoPerson) {
+                total += PRICES.twoPerson;
             }
-        }
-    } else {
-        const canvas = canvasData[0];
-        if (canvas && canvas.size) {
-            let price = canvas.basePrice;
-            if (canvas.twoPersonCanvas) {
-                price += 10;
-            }
-            canvas.totalPrice = price;
-            totalPrice += price;
-            totalCanvases = 1;
         }
     }
     
     // Apply discount
     let discount = 0;
     if (totalCanvases >= 5) {
-        discount = 0.12; // 12%
+        discount = 0.12;
     } else if (totalCanvases >= 3) {
-        discount = 0.05; // 5%
+        discount = 0.05;
     }
     
-    const discountAmount = totalPrice * discount;
-    const finalPrice = totalPrice - discountAmount;
+    const discountedTotal = total * (1 - discount);
     
-    // Update display
-    const totalPriceElement = document.getElementById('totalPrice');
-    if (totalPriceElement) {
-        totalPriceElement.textContent = `$${finalPrice.toFixed(2)}`;
-    }
-    
-    return { totalPrice, discount, finalPrice, totalCanvases };
+    document.getElementById('totalPrice').textContent = `$${discountedTotal.toFixed(2)}`;
 }
 
-// Clear form inputs
-function clearFormInputs() {
-    // Clear text inputs (except customer info)
-    document.querySelectorAll('input[type="text"]').forEach(input => {
-        if (input.id !== 'fbName' && input.id !== 'email' && input.id !== 'notes') {
-            input.value = '';
-        }
-    });
-    
-    // Clear checkboxes
-    document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-        checkbox.checked = false;
-    });
-    
-    // Clear size selections
-    document.querySelectorAll('.size-option').forEach(option => {
-        option.classList.remove('selected');
-    });
-    
-    // Clear image thumbnails
-    document.querySelectorAll('.image-thumbnails').forEach(container => {
-        container.innerHTML = '';
-    });
-    
-    // Clear validation errors
-    document.querySelectorAll('.validation-error').forEach(error => {
-        error.classList.remove('show');
-    });
-}
-
-// Validation functions
-function validateFacebookName() {
-    const input = document.getElementById('fbName');
-    const error = document.getElementById('fbName-error');
-    
-    if (!input || !error) return false;
-    
-    if (input.value.trim().length < 2) {
-        error.textContent = 'Facebook name must be at least 2 characters';
-        error.classList.add('show');
-        return false;
-    } else {
-        error.classList.remove('show');
-        return true;
-    }
-}
-
-function validateEmail() {
-    const input = document.getElementById('email');
-    const error = document.getElementById('email-error');
-    
-    if (!input || !error) return false;
-    
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    
-    if (!emailRegex.test(input.value)) {
-        error.textContent = 'Please enter a valid email address';
-        error.classList.add('show');
-        return false;
-    } else {
-        error.classList.remove('show');
-        return true;
-    }
-}
-
-function validateCanvas(canvasIndex) {
+// Validate form
+function validateForm() {
     let isValid = true;
+    const errors = [];
     
-    // Check size selection
-    const sizeError = document.getElementById(`size-error-${canvasIndex}`);
-    if (sizeError) {
-        if (!canvasData[canvasIndex]?.size) {
-            sizeError.textContent = 'Please select a canvas size';
-            sizeError.classList.add('show');
+    // Save current canvas data
+    saveCurrentCanvasData();
+    
+    // Validate each canvas
+    for (let i = 0; i < totalCanvases; i++) {
+        const data = canvasData[i];
+        
+        // Check size
+        if (!data.size) {
+            document.getElementById(`size-error-${i}`).textContent = 'Please select a size';
+            document.getElementById(`size-error-${i}`).classList.add('show');
+            errors.push(`Canvas ${i + 1}: Please select a size`);
             isValid = false;
-        } else {
-            sizeError.classList.remove('show');
         }
-    }
-    
-    // Check images
-    const imageError = document.getElementById(`image-error-${canvasIndex}`);
-    if (imageError) {
-        if (!canvasData[canvasIndex]?.images || canvasData[canvasIndex].images.length === 0) {
-            imageError.textContent = 'Please upload at least 1 image';
-            imageError.classList.add('show');
+        
+        // Check images
+        if (data.images.length === 0) {
+            document.getElementById(`image-error-${i}`).textContent = 'Please upload at least one image';
+            document.getElementById(`image-error-${i}`).classList.add('show');
+            errors.push(`Canvas ${i + 1}: Please upload at least one image`);
             isValid = false;
-        } else {
-            imageError.classList.remove('show');
         }
     }
     
-    return isValid;
-}
-
-// FAQ functions
-function openFAQ() {
-    const faqModal = document.getElementById('faqModal');
-    if (faqModal) {
-        faqModal.style.display = 'block';
-    }
-}
-
-function closeFAQ() {
-    const faqModal = document.getElementById('faqModal');
-    if (faqModal) {
-        faqModal.style.display = 'none';
-    }
-}
-
-function toggleFAQ(element) {
-    const answer = element.nextElementSibling;
-    const toggle = element.querySelector('.faq-toggle');
+    // Validate customer info
+    const fbName = document.getElementById('fbName').value.trim();
+    const email = document.getElementById('email').value.trim();
     
-    if (answer && toggle) {
-        if (answer.classList.contains('show')) {
-            answer.classList.remove('show');
-            toggle.textContent = '+';
-            element.classList.remove('active');
-        } else {
-            // Close all other FAQs
-            document.querySelectorAll('.faq-answer').forEach(ans => ans.classList.remove('show'));
-            document.querySelectorAll('.faq-toggle').forEach(tog => tog.textContent = '+');
-            document.querySelectorAll('.faq-question').forEach(q => q.classList.remove('active'));
-            
-            // Open clicked FAQ
-            answer.classList.add('show');
-            toggle.textContent = '×';
-            element.classList.add('active');
-        }
+    if (!fbName) {
+        document.getElementById('fbName-error').textContent = 'Please enter your Facebook name';
+        document.getElementById('fbName-error').classList.add('show');
+        isValid = false;
     }
+    
+    if (!email || !isValidEmail(email)) {
+        document.getElementById('email-error').textContent = 'Please enter a valid email address';
+        document.getElementById('email-error').classList.add('show');
+        isValid = false;
+    }
+    
+    return { isValid, errors };
 }
 
-// Order confirmation
+// Check valid email
+function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+// Confirm order
 function confirmOrder() {
-    // Validate required fields
-    const fbNameValid = validateFacebookName();
-    const emailValid = validateEmail();
+    const validation = validateForm();
     
-    if (!fbNameValid || !emailValid) {
-        alert('Please fill in all required customer information');
-        return;
-    }
-    
-    // Validate canvas data
-    const canvasType = document.getElementById('canvasType').value;
-    let canvasCount = 1;
-    
-    if (canvasType === 'multi') {
-        const quantitySelect = document.getElementById('canvasQuantity');
-        canvasCount = quantitySelect ? parseInt(quantitySelect.value) : 1;
-    }
-    
-    let allCanvasValid = true;
-    for (let i = 0; i < canvasCount; i++) {
-        if (!validateCanvas(i)) {
-            allCanvasValid = false;
+    if (!validation.isValid) {
+        // If multi canvas, switch to first canvas with error
+        if (totalCanvases > 1 && validation.errors.length > 0) {
+            const firstError = validation.errors[0];
+            const canvasMatch = firstError.match(/Canvas (\d+)/);
+            if (canvasMatch) {
+                switchCanvas(parseInt(canvasMatch[1]) - 1);
+            }
         }
-    }
-    
-    if (!allCanvasValid) {
-        alert('Please complete all canvas requirements (size and at least 1 image)');
         return;
     }
     
-    // Show order summary
+    // Show confirmation modal
     showOrderSummary();
 }
 
+// Show order summary
 function showOrderSummary() {
     const modal = document.getElementById('confirmModal');
-    const summaryContainer = document.getElementById('orderSummary');
+    const summary = document.getElementById('orderSummary');
     
-    if (!modal || !summaryContainer) return;
+    let html = '<div class="order-summary">';
     
-    // Build order summary
-    const pricing = updatePricing();
-    const canvasType = document.getElementById('canvasType').value;
-    const fbNameInput = document.getElementById('fbName');
-    const emailInput = document.getElementById('email');
-    const notesInput = document.getElementById('notes');
-    
-    const fbName = fbNameInput ? fbNameInput.value : '';
-    const email = emailInput ? emailInput.value : '';
-    const notes = notesInput ? notesInput.value : '';
-    
-    let summaryHTML = `
-        <div class="order-summary">
-            <h4>Customer Information:</h4>
-            <p><strong>Facebook Name:</strong> ${fbName}</p>
-            <p><strong>Email:</strong> ${email}</p>
-            
-            <h4>Canvas Details:</h4>
-    `;
-    
-    if (canvasType === 'multi') {
-        const quantitySelect = document.getElementById('canvasQuantity');
-        const quantity = quantitySelect ? parseInt(quantitySelect.value) : 1;
-        summaryHTML += `<p><strong>Type:</strong> Multiple Different Canvas (${quantity} canvas)</p>`;
-        
-        for (let i = 0; i < quantity; i++) {
-            const canvas = canvasData[i];
-            if (canvas && canvas.size) {
-                summaryHTML += `
-                    <div class="canvas-summary">
-                        <h5>Canvas ${i + 1}:</h5>
-                        <p>Size: ${canvas.size} - $${canvas.basePrice}</p>
-                        ${canvas.twoPersonCanvas ? '<p>2 people on 1 canvas: +$10</p>' : ''}
-                        <p>Images: ${canvas.images?.length || 0} uploaded</p>
-                        ${canvas.customText ? `<p>Text: "${canvas.customText}"</p>` : ''}
-                        ${canvas.date ? `<p>Date: "${canvas.date}"</p>` : ''}
-                        ${canvas.welcomeHome ? '<p>Welcome Home: Yes</p>' : ''}
-                        <p><strong>Subtotal: $${canvas.totalPrice}</strong></p>
-                    </div>
-                `;
-            }
-        }
-    } else {
-        const canvas = canvasData[0];
-        const typeText = canvasType === 'collage' ? 'Collage Multiple Images' : 'Single Canvas';
-        summaryHTML += `<p><strong>Type:</strong> ${typeText}</p>`;
-        
-        if (canvas && canvas.size) {
-            summaryHTML += `
-                <p>Size: ${canvas.size} - $${canvas.basePrice}</p>
-                ${canvas.twoPersonCanvas ? '<p>2 people on 1 canvas: +$10</p>' : ''}
-                <p>Images: ${canvas.images?.length || 0} uploaded</p>
-                ${canvas.customText ? `<p>Text: "${canvas.customText}"</p>` : ''}
-                ${canvas.date ? `<p>Date: "${canvas.date}"</p>` : ''}
-                ${canvas.welcomeHome && canvasType !== 'collage' ? '<p>Welcome Home: Yes</p>' : ''}
-                <p><strong>Subtotal: $${canvas.totalPrice}</strong></p>
-            `;
-        }
-    }
-    
-    if (notes) {
-        summaryHTML += `<p><strong>Notes:</strong> ${notes}</p>`;
-    }
-    
-    summaryHTML += `
-            <div class="pricing-summary">
-                <p>Total Canvas: ${pricing.totalCanvases}</p>
-                ${pricing.discount > 0 ? `<p>Discount (${Math.round(pricing.discount * 100)}%): -$${(pricing.totalPrice * pricing.discount).toFixed(2)}</p>` : ''}
-                <h4>Final Total: $${pricing.finalPrice.toFixed(2)}</h4>
+    // Canvas details
+    for (let i = 0; i < totalCanvases; i++) {
+        const data = canvasData[i];
+        html += `
+            <div class="canvas-summary">
+                <h4>Canvas ${i + 1}</h4>
+                <p>Size: ${data.size} inches - $${data.price}</p>
+                ${data.twoPerson ? '<p>Two Person Canvas: +$10</p>' : ''}
+                <p>Images: ${data.images.length} uploaded</p>
+                ${data.customText ? `<p>Text: ${data.customText}</p>` : ''}
+                ${data.date ? `<p>Date: ${data.date}</p>` : ''}
+                ${data.welcomeHome ? '<p>Welcome Home: Yes</p>' : ''}
             </div>
+        `;
+    }
+    
+    // Customer info
+    html += `
+        <div class="customer-summary">
+            <h4>Customer Information</h4>
+            <p>Facebook Name: ${document.getElementById('fbName').value}</p>
+            <p>Email: ${document.getElementById('email').value}</p>
         </div>
     `;
     
-    summaryContainer.innerHTML = summaryHTML;
+    // Notes
+    const notes = document.getElementById('notes').value;
+    if (notes) {
+        html += `
+            <div class="notes-summary">
+                <h4>Additional Notes</h4>
+                <p>${notes}</p>
+            </div>
+        `;
+    }
+    
+    // Total
+    const totalPrice = document.getElementById('totalPrice').textContent;
+    html += `
+        <div class="total-summary">
+            <h4>Total: ${totalPrice}</h4>
+            ${totalCanvases >= 3 ? '<p class="discount-applied">Discount applied!</p>' : ''}
+        </div>
+    `;
+    
+    html += '</div>';
+    
+    summary.innerHTML = html;
     modal.style.display = 'block';
 }
 
+// Close confirm modal
 function closeConfirmModal() {
-    const modal = document.getElementById('confirmModal');
-    if (modal) {
-        modal.style.display = 'none';
-    }
+    document.getElementById('confirmModal').style.display = 'none';
 }
 
-// Submit order (ready for n8n integration)
+// Submit order
 function submitOrder() {
-    const orderData = buildOrderData();
-    
-    // Show loading state
-    const submitBtn = document.querySelector('#confirmModal .primary-btn');
-    if (submitBtn) {
-        const originalText = submitBtn.textContent;
-        submitBtn.textContent = 'Submitting...';
-        submitBtn.disabled = true;
-        
-        // TODO: Replace with your n8n webhook URL
-        const webhookURL = 'YOUR_N8N_WEBHOOK_URL_HERE';
-        
-        // Send to n8n
-        fetch(webhookURL, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(orderData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            console.log('Order submitted successfully:', data);
-            closeConfirmModal();
-            showThankYouPage();
-        })
-        .catch(error => {
-            console.error('Error submitting order:', error);
-            alert('There was an error submitting your order. Please try again.');
-            
-            // Restore button state
-            submitBtn.textContent = originalText;
-            submitBtn.disabled = false;
-        });
-    }
-}
-
-// Build order data for n8n
-function buildOrderData() {
-    const pricing = updatePricing();
-    const canvasType = document.getElementById('canvasType').value;
-    const fbNameInput = document.getElementById('fbName');
-    const emailInput = document.getElementById('email');
-    const notesInput = document.getElementById('notes');
-    
+    // Prepare order data
     const orderData = {
-        customerInfo: {
-            fbName: fbNameInput ? fbNameInput.value : '',
-            email: emailInput ? emailInput.value : ''
+        canvases: [],
+        customer: {
+            fbName: document.getElementById('fbName').value,
+            email: document.getElementById('email').value
         },
-        canvasType: canvasType,
-        canvasOrders: [],
-        notes: notesInput ? notesInput.value : '',
-        estimatedTotal: pricing.finalPrice,
-        discount: pricing.discount,
-        totalCanvases: pricing.totalCanvases,
-        orderTimestamp: new Date().toISOString()
+        notes: document.getElementById('notes').value,
+        totalPrice: document.getElementById('totalPrice').textContent,
+        timestamp: new Date().toISOString()
     };
     
     // Add canvas data
-    if (canvasType === 'multi') {
-        const quantitySelect = document.getElementById('canvasQuantity');
-        const quantity = quantitySelect ? parseInt(quantitySelect.value) : 1;
-        for (let i = 0; i < quantity; i++) {
-            const canvas = canvasData[i];
-            if (canvas && canvas.size) {
-                orderData.canvasOrders.push({
-                    canvasId: i + 1,
-                    size: canvas.size,
-                    basePrice: canvas.basePrice,
-                    twoPersonCanvas: canvas.twoPersonCanvas,
-                    additionalFee: canvas.twoPersonCanvas ? 10 : 0,
-                    totalPrice: canvas.totalPrice,
-                    images: canvas.images || [],
-                    customText: canvas.customText || '',
-                    date: canvas.date || '',
-                    welcomeHome: canvas.welcomeHome || false
-                });
-            }
-        }
-    } else {
-        const canvas = canvasData[0];
-        if (canvas && canvas.size) {
-            orderData.canvasOrders.push({
-                canvasId: 1,
-                size: canvas.size,
-                basePrice: canvas.basePrice,
-                twoPersonCanvas: canvas.twoPersonCanvas,
-                additionalFee: canvas.twoPersonCanvas ? 10 : 0,
-                totalPrice: canvas.totalPrice,
-                images: canvas.images || [],
-                customText: canvas.customText || '',
-                date: canvas.date || '',
-                welcomeHome: canvasType !== 'collage' ? (canvas.welcomeHome || false) : false
-            });
-        }
+    for (let i = 0; i < totalCanvases; i++) {
+        orderData.canvases.push({
+            canvasNumber: i + 1,
+            size: canvasData[i].size,
+            price: canvasData[i].price,
+            twoPerson: canvasData[i].twoPerson,
+            images: canvasData[i].images,
+            customText: canvasData[i].customText,
+            date: canvasData[i].date,
+            welcomeHome: canvasData[i].welcomeHome
+        });
     }
     
-    return orderData;
+    // Send order (you would implement the actual API call here)
+    console.log('Order submitted:', orderData);
+    
+    // For now, just show thank you page
+    closeConfirmModal();
+    showThankYouPage();
 }
 
 // Show thank you page
 function showThankYouPage() {
-    const thankYouPage = document.getElementById('thankYouPage');
-    if (thankYouPage) {
-        thankYouPage.style.display = 'flex';
-    }
+    document.getElementById('thankYouPage').style.display = 'flex';
 }
 
 // Start new order
 function startNewOrder() {
-    location.reload();
+    // Reset everything
+    canvasData = {};
+    currentCanvas = 0;
+    totalCanvases = 1;
+    
+    // Reset form
+    document.getElementById('canvasType').value = 'single';
+    document.getElementById('canvasQuantity').value = '2';
+    document.getElementById('fbName').value = '';
+    document.getElementById('email').value = '';
+    document.getElementById('notes').value = '';
+    
+    // Hide thank you page
+    document.getElementById('thankYouPage').style.display = 'none';
+    
+    // Reinitialize
+    initializeCanvas(0);
+    handleCanvasTypeChange();
+    
+    // Clear all form fields
+    document.querySelectorAll('input[type="text"], input[type="email"], textarea').forEach(input => {
+        input.value = '';
+    });
+    document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+        checkbox.checked = false;
+    });
+    document.querySelectorAll('.size-option').forEach(option => {
+        option.classList.remove('selected');
+    });
+    document.querySelectorAll('.selected-price').forEach(price => {
+        price.style.display = 'none';
+    });
+    document.querySelectorAll('.image-thumbnails').forEach(container => {
+        container.innerHTML = '';
+    });
+    document.querySelectorAll('.validation-error').forEach(error => {
+        error.textContent = '';
+        error.classList.remove('show');
+    });
+    
+    updateTotalPrice();
+}
+
+// FAQ functions
+function openFAQ() {
+    document.getElementById('faqModal').style.display = 'block';
+}
+
+function closeFAQ() {
+    document.getElementById('faqModal').style.display = 'none';
+}
+
+function toggleFAQ(element) {
+    const answer = element.nextElementSibling;
+    element.classList.toggle('active');
+    answer.classList.toggle('show');
+}
+
+// Update language
+function updateLanguage() {
+    document.querySelectorAll('[data-translate]').forEach(element => {
+        const key = element.getAttribute('data-translate');
+        if (translations[currentLanguage] && translations[currentLanguage][key]) {
+            element.textContent = translations[currentLanguage][key];
+        }
+    });
+    
+    document.querySelectorAll('[data-translate-placeholder]').forEach(element => {
+        const key = element.getAttribute('data-translate-placeholder');
+        if (translations[currentLanguage] && translations[currentLanguage][key]) {
+            element.placeholder = translations[currentLanguage][key];
+        }
+    });
+}
+
+// Close modals when clicking outside
+window.onclick = function(event) {
+    if (event.target.classList.contains('modal')) {
+        event.target.style.display = 'none';
+        if (cropper) {
+            cropper.destroy();
+            cropper = null;
+        }
+    }
 }
