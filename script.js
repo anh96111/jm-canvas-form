@@ -1011,7 +1011,7 @@ async function submitOrder() {
         showLoading('Uploading to server...');
         
         // Send to Apps Script
-        const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbygWj_cmQvy29D_K31Kci2g0iBIycf9he2SiRFuU3PsBznjofyZjjQZ-kmDAgRUOzAQ/exec';
+        const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbzYFvy-26lB1sTHZRlN2lA4pnwpUVgwubuusoCk_gKkiCiOHA0ZbDfRMS6uzt0mVeR-/exec';
         const appsScriptResponse = await fetch(appsScriptUrl, {
             method: 'POST',
             mode: 'no-cors',
