@@ -6,6 +6,21 @@
     <title>JM-Canvas Order Form</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Inline styles for immediate font size increase */
+        body {
+            font-size: 18px !important;
+        }
+        
+        .logo {
+            max-width: 150px !important;
+            height: auto !important;
+        }
+        
+        .header h1 {
+            font-size: 28px !important;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
@@ -83,16 +98,20 @@
                         <div class="size-grid">
                             <div class="size-option" data-size="8x10" onclick="selectSize('8x10', 0)">
                                 <div class="size-display">8x10 inches</div>
+                                <div class="collage-price" style="display: none;">+$5 for collage</div>
                             </div>
                             <div class="size-option" data-size="11x14" onclick="selectSize('11x14', 0)">
                                 <div class="size-display">11x14 inches</div>
                                 <div class="best-seller" data-translate="bestSeller">Best Seller</div>
+                                <div class="collage-price" style="display: none;">+$5 for collage</div>
                             </div>
                             <div class="size-option" data-size="16x20" onclick="selectSize('16x20', 0)">
                                 <div class="size-display">16x20 inches</div>
+                                <div class="collage-price" style="display: none;">+$5 for collage</div>
                             </div>
                             <div class="size-option" data-size="20x30" onclick="selectSize('20x30', 0)">
                                 <div class="size-display">20x30 inches</div>
+                                <div class="collage-price" style="display: none;">+$5 for collage</div>
                             </div>
                         </div>
                         <div class="selected-price" id="selectedPrice-0" style="display: none;"></div>
@@ -138,7 +157,7 @@
                     </div>
 
                     <!-- Date -->
-                    <div class="form-section canvas-item" data-canvas="0">
+                    <div class="form-section canvas-item" data-canvas="0" id="dateSection-0">
                         <div class="form-group">
                             <label data-translate="date">Date</label>
                             <input type="text" id="date-0" placeholder="e.g., Dec 25, 2024" data-translate-placeholder="datePlaceholder">
@@ -190,6 +209,11 @@
                         <label data-translate="email">Email *</label>
                         <input type="email" id="email" required placeholder="your@email.com" data-translate-placeholder="emailPlaceholder">
                         <div class="validation-error" id="email-error"></div>
+                    </div>
+                    <div class="form-group">
+                        <label data-translate="phone">Phone number</label>
+                        <input type="tel" id="phone" placeholder="Enter your phone number (optional)" data-translate-placeholder="phonePlaceholder" style="width: 100%; padding: 12px 15px; font-size: 18px; border: 2px solid #ddd; border-radius: 8px; transition: border-color 0.3s ease;" pattern="^[+0-9\s-]*$" maxlength="20" autocomplete="tel">
+                        <div class="validation-error" id="phone-error"></div>
                     </div>
                 </div>
 
@@ -294,6 +318,9 @@
             <div class="preview-container">
                 <canvas id="previewCanvas" width="400" height="500"></canvas>
             </div>
+            <div class="preview-footer">
+                <button onclick="closePreviewModal()" class="primary-btn" data-translate="closePreview">Close Preview</button>
+            </div>
         </div>
     </div>
 
@@ -322,6 +349,39 @@
     </div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script>
+        // Update collage price display when canvas type changes
+        function updateCollagePriceDisplay() {
+            const canvasType = document.getElementById('canvasType').value;
+            const collagePrices = document.querySelectorAll('.collage-price');
+            
+            collagePrices.forEach(price => {
+                price.style.display = canvasType === 'collage' ? 'block' : 'none';
+            });
+        }
+        
+        // Add to existing handleCanvasTypeChange function
+        const originalHandleCanvasTypeChange = window.handleCanvasTypeChange;
+        window.handleCanvasTypeChange = function() {
+            if (originalHandleCanvasTypeChange) {
+                originalHandleCanvasTypeChange();
+            }
+            updateCollagePriceDisplay();
+            
+            // Update date and welcome home visibility
+            const dateSection = document.getElementById('dateSection-0');
+            const welcomeHomeSection = document.getElementById('welcomeHomeSection-0');
+            const canvasType = document.getElementById('canvasType').value;
+            
+            if (canvasType === 'collage') {
+                if (dateSection) dateSection.style.display = 'none';
+                if (welcomeHomeSection) welcomeHomeSection.style.display = 'none';
+            } else {
+                if (dateSection) dateSection.style.display = 'block';
+                if (welcomeHomeSection) welcomeHomeSection.style.display = 'block';
+            }
+        }
+    </script>
     <script src="translations.js"></script>
     <script src="script.js"></script>
 </body>

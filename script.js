@@ -1,298 +1,556 @@
 // Global variables
-let currentLanguage = 'en';
-let canvasData = {};
-let currentCanvas = 0;
-let totalCanvases = 1;
 let cropper = null;
-let currentCropData = null;
+let currentCropIndex = 0;
+let currentCanvasIndex = 0;
+let uploadedImages = {}; // Changed to object to store images per canvas
+let currentLanguage = 'en';
+let canvasCount = 1;
+let canvasType = 'single';
+let urlParams = {};
 
-// Prices configuration
-const PRICES = {
-    '8x10': 34,
-    '11x14': 43,
-    '16x20': 62,
-    '20x30': 82,
-    'twoPerson': 10
-};
-
-// Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
-    initializeCanvas(0);
-    updateLanguage();
-    updateTotalPrice();
-    
-    // Add character counter listener
-    document.getElementById('customText-0').addEventListener('input', function(e) {
-        updateCharCounter(0);
+// ========== IMAGE COMPRESSION FUNCTIONS ==========
+// Flexible compression - không bắt buộc size tối thiểu
+async function compressImage(file, maxWidth = 4000, quality = 0.92) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const img = new Image();
+            img.onload = function() {
+                // Lấy kích thước gốc
+                const originalWidth = img.width;
+                const originalHeight = img.height;
+                
+                console.log(`Original image: ${originalWidth}x${originalHeight}px`);
+                
+                // GIỮ NGUYÊN nếu ảnh nhỏ - không upscale
+                if (originalWidth < 1000 && originalHeight < 1000) {
+                    console.log('Small image - keeping original quality');
+                    resolve(e.target.result);
+                    return;
+                }
+                
+                // Chỉ resize nếu ảnh LỚN HƠN maxWidth
+                let width = originalWidth;
+                let height = originalHeight;
+                
+                if (width > maxWidth || height > maxWidth) {
+                    // Resize giữ tỷ lệ
+                    if (width > height) {
+                        height = (maxWidth / width) * height;
+                        width = maxWidth;
+                    } else {
+                        width = (maxWidth / height) * width;
+                        height = maxWidth;
+                    }
+                }
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                
+                const ctx = canvas.getContext('2d');
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
+                ctx.drawImage(img, 0, 0, width, height);
+                
+                // Convert với quality phù hợp
+                canvas.toBlob((blob) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.readAsDataURL(blob);
+                }, 'image/jpeg', quality);
+            };
+            img.onerror = reject;
+            img.src = e.target.result;
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
     });
+}
+
+// Smart compression dựa trên file size
+async function smartCompressImage(file) {
+    const fileSizeMB = file.size / (1024 * 1024);
+    
+    // Quy tắc compression thông minh
+    let settings = {
+        maxWidth: 4000,
+        quality: 0.92
+    };
+    
+    if (fileSizeMB < 1) {
+        // Ảnh nhỏ < 1MB: giữ nguyên
+        console.log('Small file - no compression needed');
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.readAsDataURL(file);
+        });
+        
+    } else if (fileSizeMB < 3) {
+        // Ảnh 1-3MB: compress nhẹ
+        settings = { maxWidth: 3000, quality: 0.90 };
+        
+    } else if (fileSizeMB < 5) {
+        // Ảnh 3-5MB: compress vừa
+        settings = { maxWidth: 2500, quality: 0.85 };
+        
+    } else {
+        // Ảnh > 5MB: compress mạnh hơn
+        settings = { maxWidth: 2000, quality: 0.80 };
+    }
+    
+    console.log(`File ${fileSizeMB.toFixed(1)}MB - Using settings:`, settings);
+    return compressImage(file, settings.maxWidth, settings.quality);
+}
+
+// Compress base64 image
+async function compressBase64Image(base64String, maxWidth = 1200, quality = 0.8) {
+    return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = function() {
+            const canvas = document.createElement('canvas');
+            let width = img.width;
+            let height = img.height;
+            
+            if (width > maxWidth) {
+                height = (maxWidth / width) * height;
+                width = maxWidth;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Return compressed base64
+            resolve(canvas.toDataURL('image/jpeg', quality));
+        };
+        img.onerror = reject;
+        img.src = base64String;
+    });
+}
+
+// Show loading overlay
+function showLoading(message = 'Processing...') {
+    // Remove existing overlay if any
+    hideLoading();
+    
+    const overlay = document.createElement('div');
+    overlay.id = 'loadingOverlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    `;
+    
+    overlay.innerHTML = `
+        <div style="
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        ">
+            <div style="
+                width: 50px;
+                height: 50px;
+                border: 3px solid #f3f3f3;
+                border-top: 3px solid #2c5f41;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 20px;
+            "></div>
+            <p style="
+                margin: 0;
+                font-size: 18px;
+                color: #333;
+            ">${message}</p>
+        </div>
+        <style>
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        </style>
+    `;
+    
+    document.body.appendChild(overlay);
+}
+
+// Hide loading overlay
+function hideLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.remove();
+    }
+}
+// ========== END COMPRESSION FUNCTIONS ==========
+
+// Initialize when DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    // Parse URL parameters from Facebook
+    parseURLParameters();
+    
+    // Initialize language
+    const savedLang = localStorage.getItem('selectedLanguage') || 'en';
+    setLanguage(savedLang);
+    
+    // Initialize form
+    initializeForm();
+    
+    // Add input listeners
+    addInputListeners();
+    
+    // Initialize uploadedImages for first canvas
+    uploadedImages[0] = [];
 });
 
-// Initialize canvas data
-function initializeCanvas(canvasIndex) {
-    if (!canvasData[canvasIndex]) {
-        canvasData[canvasIndex] = {
-            size: null,
-            price: 0,
-            images: [],
-            customText: '',
-            date: '',
-            welcomeHome: false,
-            twoPerson: false
-        };
+// Parse URL parameters from Facebook Messenger
+function parseURLParameters() {
+    const params = new URLSearchParams(window.location.search);
+    urlParams = {
+        psid: params.get('psid') || '',
+        fb_name: params.get('fb_name') || '',
+        ref: params.get('ref') || '',
+        fbc: params.get('fbc') || '',
+        fbp: params.get('fbp') || ''
+    };
+    
+    // Pre-fill Facebook name if available
+    if (urlParams.fb_name) {
+        const fbNameInput = document.getElementById('fbName');
+        if (fbNameInput) {
+            fbNameInput.value = decodeURIComponent(urlParams.fb_name);
+        }
+    }
+}
+
+// Initialize form
+function initializeForm() {
+    // Set default canvas type
+    document.getElementById('canvasType').value = 'single';
+    handleCanvasTypeChange();
+}
+
+// Add input listeners
+function addInputListeners() {
+    // Custom text character counter
+    document.querySelectorAll('[id^="customText-"]').forEach(input => {
+        input.addEventListener('input', function() {
+            const canvasIndex = parseInt(this.id.split('-')[1]);
+            updateCharCount(canvasIndex);
+        });
+    });
+    
+    // Phone number formatting
+    const phoneInput = document.getElementById('phone');
+    if (phoneInput) {
+        phoneInput.addEventListener('input', function(e) {
+            // Allow only numbers, spaces, hyphens, and plus sign
+            this.value = this.value.replace(/[^0-9\s\-+]/g, '');
+        });
     }
 }
 
 // Handle canvas type change
 function handleCanvasTypeChange() {
-    const canvasType = document.getElementById('canvasType').value;
+    const type = document.getElementById('canvasType').value;
+    canvasType = type;
     const multiSection = document.getElementById('multiCanvasSection');
     const canvasTabs = document.getElementById('canvasTabs');
     const miniNav = document.getElementById('miniCanvasNav');
     
-    if (canvasType === 'multi') {
+    if (type === 'multi' || type === 'collage') {
         multiSection.style.display = 'block';
         canvasTabs.style.display = 'flex';
         miniNav.style.display = 'block';
+        
+        // Update section title for collage
+        const sectionTitle = multiSection.querySelector('label');
+        if (type === 'collage') {
+            sectionTitle.setAttribute('data-translate', 'selectQuantityCollage');
+            sectionTitle.textContent = translations[currentLanguage].selectQuantityCollage || 'How many collage canvas?';
+        } else {
+            sectionTitle.setAttribute('data-translate', 'selectQuantity');
+            sectionTitle.textContent = translations[currentLanguage].selectQuantity || 'How many different canvas?';
+        }
+        
         updateCanvasCount();
     } else {
         multiSection.style.display = 'none';
         canvasTabs.style.display = 'none';
         miniNav.style.display = 'none';
-        totalCanvases = 1;
+        canvasCount = 1;
         
-        // Keep canvas 1 data when switching back to single
-        const tempData = canvasData[0];
-        canvasData = { 0: tempData || {} };
-        initializeCanvas(0);
+        // Reset to single canvas
+        resetToSingleCanvas();
     }
+    
+    updateTotalPrice();
 }
 
-// Update canvas count for multi canvas
+// Reset to single canvas
+function resetToSingleCanvas() {
+    // Keep only canvas 0 images
+    const tempImages = uploadedImages[0] || [];
+    uploadedImages = { 0: tempImages };
+    
+    // Reset UI
+    currentCanvasIndex = 0;
+    updateCanvasUI();
+}
+
+// Update canvas count
 function updateCanvasCount() {
     const quantity = parseInt(document.getElementById('canvasQuantity').value);
-    totalCanvases = quantity;
+    canvasCount = quantity;
     
-    // Update discount notification
-    const discountNotification = document.getElementById('discountNotification');
-    const discountText = document.querySelector('.discount-text');
-    
-    if (quantity >= 5) {
-        discountNotification.style.display = 'block';
-        discountText.textContent = 'You qualify for 12% discount!';
-    } else if (quantity >= 3) {
-        discountNotification.style.display = 'block';
-        discountText.textContent = 'You qualify for 5% discount!';
-    } else {
-        discountNotification.style.display = 'none';
-    }
-    
-    // Generate tabs
-    generateCanvasTabs();
-    generateMiniTabs();
-    
-    // Initialize new canvases
+    // Initialize uploadedImages for each canvas if not exists
     for (let i = 0; i < quantity; i++) {
-        initializeCanvas(i);
-        if (i > 0) {
-            duplicateCanvasElements(i);
+        if (!uploadedImages[i]) {
+            uploadedImages[i] = [];
         }
     }
     
-    // Remove extra canvases
-    for (let i = quantity; i < 10; i++) {
-        removeCanvasElements(i);
-        delete canvasData[i];
-    }
+    // Remove excess canvas images
+    Object.keys(uploadedImages).forEach(key => {
+        if (parseInt(key) >= quantity) {
+            delete uploadedImages[key];
+        }
+    });
     
+    generateCanvasTabs();
+    updateDiscountNotification();
     updateTotalPrice();
 }
 
 // Generate canvas tabs
 function generateCanvasTabs() {
     const tabsContainer = document.getElementById('canvasTabs');
+    const miniTabsContainer = document.getElementById('miniTabs');
     tabsContainer.innerHTML = '';
+    miniTabsContainer.innerHTML = '';
     
-    for (let i = 0; i < totalCanvases; i++) {
+    for (let i = 0; i < canvasCount; i++) {
+        // Main tab
         const tab = document.createElement('div');
-        tab.className = 'tab' + (i === currentCanvas ? ' active' : '');
+        tab.className = i === currentCanvasIndex ? 'tab active' : 'tab';
         tab.textContent = `Canvas ${i + 1}`;
         tab.onclick = () => switchCanvas(i);
         tabsContainer.appendChild(tab);
-    }
-}
-
-// Generate mini tabs for bottom navigation
-function generateMiniTabs() {
-    const miniTabsContainer = document.getElementById('miniTabs');
-    miniTabsContainer.innerHTML = '';
-    
-    // Show 2-3 tabs around current
-    let start = Math.max(0, currentCanvas - 1);
-    let end = Math.min(totalCanvases - 1, start + 2);
-    
-    if (end - start < 2 && totalCanvases > 2) {
-        start = Math.max(0, end - 2);
-    }
-    
-    for (let i = start; i <= end; i++) {
-        const tab = document.createElement('div');
-        tab.className = 'mini-tab' + (i === currentCanvas ? ' active' : '');
-        tab.textContent = `Canvas ${i + 1}`;
-        tab.onclick = () => switchCanvas(i);
-        miniTabsContainer.appendChild(tab);
+        
+        // Mini tab
+        const miniTab = document.createElement('div');
+        miniTab.className = i === currentCanvasIndex ? 'mini-tab active' : 'mini-tab';
+        miniTab.textContent = i + 1;
+        miniTab.onclick = () => switchCanvas(i);
+        miniTabsContainer.appendChild(miniTab);
     }
     
     // Update counter
-    document.getElementById('currentCanvasNum').textContent = currentCanvas + 1;
-    document.getElementById('totalCanvasNum').textContent = totalCanvases;
+    document.getElementById('currentCanvasNum').textContent = currentCanvasIndex + 1;
+    document.getElementById('totalCanvasNum').textContent = canvasCount;
 }
 
-// Switch between canvases
+// Switch canvas
 function switchCanvas(index) {
-    // Save current canvas data
-    saveCurrentCanvasData();
+    currentCanvasIndex = index;
     
-    // Hide current canvas elements
-    document.querySelectorAll(`.canvas-item[data-canvas="${currentCanvas}"]`).forEach(el => {
-        el.style.display = 'none';
-    });
-    
-    // Show new canvas elements
-    document.querySelectorAll(`.canvas-item[data-canvas="${index}"]`).forEach(el => {
-        el.style.display = 'block';
-    });
-    
-    // Update active tab
-    document.querySelectorAll('.canvas-tabs .tab').forEach((tab, i) => {
+    // Update active tabs
+    document.querySelectorAll('.tab').forEach((tab, i) => {
         tab.classList.toggle('active', i === index);
     });
     
-    currentCanvas = index;
-    
-    // Update mini tabs
-    generateMiniTabs();
-    
-    // Load canvas data
-    loadCanvasData(index);
-}
-
-// Save current canvas data
-function saveCurrentCanvasData() {
-    const data = canvasData[currentCanvas];
-    data.customText = document.getElementById(`customText-${currentCanvas}`).value;
-    data.date = document.getElementById(`date-${currentCanvas}`).value;
-    data.welcomeHome = document.getElementById(`welcomeHome-${currentCanvas}`).checked;
-    data.twoPerson = document.getElementById(`twoPersonCanvas-${currentCanvas}`).checked;
-}
-
-// Load canvas data
-function loadCanvasData(index) {
-    const data = canvasData[index];
-    if (!data) return;
-    
-    document.getElementById(`customText-${index}`).value = data.customText || '';
-    document.getElementById(`date-${index}`).value = data.date || '';
-    document.getElementById(`welcomeHome-${index}`).checked = data.welcomeHome || false;
-    document.getElementById(`twoPersonCanvas-${index}`).checked = data.twoPerson || false;
-    
-    updateCharCounter(index);
-}
-
-// Duplicate canvas elements for multi canvas
-function duplicateCanvasElements(index) {
-    const container = document.getElementById('canvasItemsContainer');
-    const originalElements = document.querySelectorAll('.canvas-item[data-canvas="0"]');
-    
-    originalElements.forEach(element => {
-        const clone = element.cloneNode(true);
-        clone.setAttribute('data-canvas', index);
-        clone.style.display = 'none';
-        
-        // Update IDs and attributes
-        clone.querySelectorAll('[id]').forEach(el => {
-            const oldId = el.id;
-            const newId = oldId.replace('-0', `-${index}`);
-            el.id = newId;
-            
-            // Update onchange/onclick attributes
-            if (el.hasAttribute('onchange')) {
-                el.setAttribute('onchange', el.getAttribute('onchange').replace('(0)', `(${index})`));
-            }
-            if (el.hasAttribute('onclick')) {
-                el.setAttribute('onclick', el.getAttribute('onclick').replace('(0)', `(${index})`));
-            }
-        });
-        
-        // Update labels
-        clone.querySelectorAll('label[for]').forEach(label => {
-            const forAttr = label.getAttribute('for');
-            label.setAttribute('for', forAttr.replace('-0', `-${index}`));
-        });
-        
-        // Clear values
-        clone.querySelectorAll('input[type="text"], input[type="email"], textarea').forEach(input => {
-            input.value = '';
-        });
-        clone.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-            checkbox.checked = false;
-        });
-        
-        container.appendChild(clone);
+    document.querySelectorAll('.mini-tab').forEach((tab, i) => {
+        tab.classList.toggle('active', i === index);
     });
     
-    // Add character counter listener
-    document.getElementById(`customText-${index}`).addEventListener('input', function(e) {
-        updateCharCounter(index);
-    });
+    // Update counter
+    document.getElementById('currentCanvasNum').textContent = index + 1;
+    
+    // Update canvas UI
+    updateCanvasUI();
 }
 
-// Remove canvas elements
-function removeCanvasElements(index) {
-    document.querySelectorAll(`.canvas-item[data-canvas="${index}"]`).forEach(el => {
-        el.remove();
+// Update canvas UI for current canvas
+function updateCanvasUI() {
+    // Update size selection
+    const selectedSize = getSelectedSize(currentCanvasIndex);
+    document.querySelectorAll('.size-option').forEach(option => {
+        option.classList.remove('selected');
+        if (option.dataset.size === selectedSize) {
+            option.classList.add('selected');
+        }
     });
+    
+    // Update two person checkbox visibility for collage
+    const twoPersonSection = document.getElementById('twoPersonSection-0');
+    if (canvasType === 'collage') {
+        twoPersonSection.style.display = 'none';
+    } else {
+        twoPersonSection.style.display = 'block';
+    }
+    
+    // Update welcome home visibility for collage
+    const welcomeHomeSection = document.getElementById('welcomeHomeSection-0');
+    const dateInput = document.querySelector('.form-section:has(#date-0)');
+    if (canvasType === 'collage') {
+        welcomeHomeSection.style.display = 'none';
+        if (dateInput) dateInput.style.display = 'none';
+    } else {
+        welcomeHomeSection.style.display = 'block';
+        if (dateInput) dateInput.style.display = 'block';
+    }
+    
+    // Update image thumbnails
+    updateImageThumbnails();
+    
+    // Update form values
+    updateFormValues();
+    
+    // Update price display
+    updatePriceDisplay();
+}
+
+// Update form values for current canvas
+function updateFormValues() {
+    const canvasData = getCanvasData(currentCanvasIndex);
+    
+    // Update text fields
+    document.getElementById('customText-0').value = canvasData.customText || '';
+    document.getElementById('date-0').value = canvasData.date || '';
+    
+    // Update checkboxes
+    document.getElementById('twoPersonCanvas-0').checked = canvasData.twoPersonCanvas || false;
+    document.getElementById('welcomeHome-0').checked = canvasData.welcomeHome || false;
+    
+    // Update character counter
+    updateCharCount(0);
+}
+
+// Get canvas data
+function getCanvasData(index) {
+    if (!window.canvasData) {
+        window.canvasData = {};
+    }
+    
+    if (!window.canvasData[index]) {
+        window.canvasData[index] = {
+            size: '',
+            twoPersonCanvas: false,
+            customText: '',
+            date: '',
+            welcomeHome: false
+        };
+    }
+    
+    return window.canvasData[index];
+}
+
+// Save canvas data
+function saveCanvasData(index) {
+    if (!window.canvasData) {
+        window.canvasData = {};
+    }
+    
+    window.canvasData[index] = {
+        size: getSelectedSize(index),
+        twoPersonCanvas: document.getElementById('twoPersonCanvas-0').checked,
+        customText: document.getElementById('customText-0').value,
+        date: document.getElementById('date-0').value,
+        welcomeHome: document.getElementById('welcomeHome-0').checked
+    };
 }
 
 // Select size
 function selectSize(size, canvasIndex) {
+    // Save current canvas data before switching
+    saveCanvasData(currentCanvasIndex);
+    
     // Update UI
-    document.querySelectorAll(`.canvas-item[data-canvas="${canvasIndex}"] .size-option`).forEach(option => {
+    document.querySelectorAll('.size-option').forEach(option => {
         option.classList.remove('selected');
     });
     
-    document.querySelector(`.canvas-item[data-canvas="${canvasIndex}"] .size-option[data-size="${size}"]`).classList.add('selected');
+    document.querySelector(`[data-size="${size}"]`).classList.add('selected');
+    
+    // Save size for current canvas
+    const canvasData = getCanvasData(currentCanvasIndex);
+    canvasData.size = size;
     
     // Update price display
-    const priceDisplay = document.getElementById(`selectedPrice-${canvasIndex}`);
-    const price = PRICES[size];
-    priceDisplay.textContent = `$${price}`;
-    priceDisplay.style.display = 'block';
-    priceDisplay.classList.add('show');
-    
-    // Update data
-    canvasData[canvasIndex].size = size;
-    canvasData[canvasIndex].price = price;
+    updatePriceDisplay();
+    updateTotalPrice();
     
     // Clear validation error
-    const errorElement = document.getElementById(`size-error-${canvasIndex}`);
-    errorElement.textContent = '';
-    errorElement.classList.remove('show');
+    document.getElementById('size-error-0').textContent = '';
+}
+
+// Get selected size
+function getSelectedSize(canvasIndex) {
+    const canvasData = getCanvasData(canvasIndex);
+    return canvasData.size || '';
+}
+
+// Update price display
+function updatePriceDisplay() {
+    const size = getSelectedSize(currentCanvasIndex);
+    const priceDisplay = document.getElementById('selectedPrice-0');
     
-    updateTotalPrice();
+    if (size) {
+        const basePrice = getBasePrice(size);
+        const canvasData = getCanvasData(currentCanvasIndex);
+        let price = basePrice;
+        
+        // Add collage price
+        if (canvasType === 'collage') {
+            price += 5;
+        }
+        
+        // Add two person price
+        if (canvasData.twoPersonCanvas && canvasType !== 'collage') {
+            price += 10;
+        }
+        
+        priceDisplay.textContent = `Price: $${price}`;
+        priceDisplay.style.display = 'block';
+    } else {
+        priceDisplay.style.display = 'none';
+    }
+}
+
+// Get base price
+function getBasePrice(size) {
+    const prices = {
+        '8x10': 34,
+        '11x14': 43,
+        '16x20': 62,
+        '20x30': 82
+    };
+    return prices[size] || 0;
 }
 
 // Handle two person change
 function handleTwoPersonChange(canvasIndex) {
-    const isChecked = document.getElementById(`twoPersonCanvas-${canvasIndex}`).checked;
-    canvasData[canvasIndex].twoPerson = isChecked;
+    saveCanvasData(currentCanvasIndex);
+    updatePriceDisplay();
     updateTotalPrice();
 }
 
-// Update character counter
-function updateCharCounter(canvasIndex) {
-    const input = document.getElementById(`customText-${canvasIndex}`);
-    const counter = document.getElementById(`charCount-${canvasIndex}`);
-    if (counter) {
+// Update character count
+function updateCharCount(index) {
+    const input = document.getElementById(`customText-${index}`);
+    const counter = document.getElementById(`charCount-${index}`);
+    if (input && counter) {
         counter.textContent = input.value.length;
     }
 }
@@ -302,87 +560,120 @@ function triggerFileInput(canvasIndex) {
     document.getElementById(`imageInput-${canvasIndex}`).click();
 }
 
-// Handle image upload
-function handleImageUpload(event, canvasIndex) {
+// Handle image upload - Updated with smart compression
+async function handleImageUpload(event, canvasIndex) {
     const files = Array.from(event.target.files);
-    const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-    const maxImages = 6;
+    const currentImages = uploadedImages[currentCanvasIndex] || [];
     
-    // Clear validation error
-    const errorElement = document.getElementById(`image-error-${canvasIndex}`);
-    errorElement.textContent = '';
-    errorElement.classList.remove('show');
-    
-    // Check current image count
-    if (canvasData[canvasIndex].images.length >= maxImages) {
-        errorElement.textContent = `Maximum ${maxImages} images allowed`;
-        errorElement.classList.add('show');
+    if (currentImages.length + files.length > 6) {
+        alert(translations[currentLanguage].maxImagesError || 'Maximum 6 images per canvas allowed');
         return;
     }
     
-    // Validate files
-    const validFiles = files.filter(file => {
-        if (!validTypes.includes(file.type)) {
-            errorElement.textContent = 'Only JPG and PNG files are allowed';
-            errorElement.classList.add('show');
-            return false;
-        }
-        return true;
-    });
+    showLoading('Processing images...');
     
-    // Process valid files
-    validFiles.forEach(file => {
-        if (canvasData[canvasIndex].images.length < maxImages) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                // Open crop modal
-                openCropModal(e.target.result, canvasIndex);
-            };
-            reader.readAsDataURL(file);
+    for (const [index, file] of files.entries()) {
+        if (file.type.match(/image\/(jpeg|jpg|png)/)) {
+            try {
+                // Smart compress - tự động quyết định dựa trên file size
+                const processedImage = await smartCompressImage(file);
+                
+                if (!uploadedImages[currentCanvasIndex]) {
+                    uploadedImages[currentCanvasIndex] = [];
+                }
+                
+                const imageData = {
+                    original: processedImage,
+                    cropped: null,
+                    file: file,
+                    fileSize: (file.size / (1024 * 1024)).toFixed(2) + 'MB'
+                };
+                
+                uploadedImages[currentCanvasIndex].push(imageData);
+                
+                // Auto crop ảnh đầu tiên
+                if (index === 0) {
+                    openCropModal(processedImage, uploadedImages[currentCanvasIndex].length - 1);
+                } else {
+                    updateImageThumbnails();
+                }
+                
+            } catch (error) {
+                console.error('Error processing image:', error);
+                alert('Error processing image: ' + file.name);
+            }
         }
-    });
+    }
     
-    // Clear input
+    hideLoading();
     event.target.value = '';
 }
 
+// Update image thumbnails
+function updateImageThumbnails() {
+    const container = document.getElementById('imageThumbnails-0');
+    container.innerHTML = '';
+    
+    const currentImages = uploadedImages[currentCanvasIndex] || [];
+    
+    currentImages.forEach((imageData, index) => {
+        const thumbnail = document.createElement('div');
+        thumbnail.className = 'image-thumbnail';
+        
+        const img = document.createElement('img');
+        img.src = imageData.cropped || imageData.original;
+        
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'remove-image';
+        removeBtn.innerHTML = '×';
+        removeBtn.onclick = () => removeImage(index);
+        
+        thumbnail.appendChild(img);
+        thumbnail.appendChild(removeBtn);
+        container.appendChild(thumbnail);
+    });
+    
+    // Clear validation error
+    if (currentImages.length > 0) {
+        document.getElementById('image-error-0').textContent = '';
+    }
+}
+
+// Remove image
+function removeImage(index) {
+    uploadedImages[currentCanvasIndex].splice(index, 1);
+    updateImageThumbnails();
+}
+
 // Open crop modal
-function openCropModal(imageSrc, canvasIndex) {
+function openCropModal(imageSrc, imageIndex) {
+    currentCropIndex = imageIndex;
     const modal = document.getElementById('cropModal');
-    const image = document.getElementById('cropImage');
+    const cropImage = document.getElementById('cropImage');
     
-    currentCropData = {
-        canvasIndex: canvasIndex,
-        originalSrc: imageSrc
-    };
-    
-    image.src = imageSrc;
-    modal.style.display = 'block';
+    cropImage.src = imageSrc;
+    modal.style.display = 'flex';
     
     // Initialize cropper
-    if (cropper) {
-        cropper.destroy();
-    }
-    
-    cropper = new Cropper(image, {
-        aspectRatio: 8 / 10,
-        viewMode: 1,
-        guides: true,
-        center: true,
-        highlight: true,
-        background: true,
-        autoCrop: true,
-        autoCropArea: 0.8,
-        movable: true,
-        rotatable: true,
-        scalable: true,
-        zoomable: true,
-        zoomOnTouch: true,
-        zoomOnWheel: true,
-        cropBoxMovable: true,
-        cropBoxResizable: true,
-        toggleDragModeOnDblclick: true
-    });
+    setTimeout(() => {
+        if (cropper) {
+            cropper.destroy();
+        }
+        
+        cropper = new Cropper(cropImage, {
+            aspectRatio: 8 / 10,
+            viewMode: 1,
+            guides: true,
+            center: true,
+            highlight: true,
+            background: true,
+            autoCropArea: 1,
+            movable: true,
+            rotatable: false,
+            scalable: true,
+            zoomable: true
+        });
+    }, 100);
 }
 
 // Cancel crop
@@ -392,50 +683,160 @@ function cancelCrop() {
         cropper = null;
     }
     document.getElementById('cropModal').style.display = 'none';
-    currentCropData = null;
 }
 
 // Apply crop
 function applyCrop() {
-    if (!cropper || !currentCropData) return;
+    if (cropper) {
+        const canvas = cropper.getCroppedCanvas({
+            width: 800,
+            height: 1000
+        });
+        
+        const croppedImage = canvas.toDataURL('image/jpeg', 0.9);
+        uploadedImages[currentCanvasIndex][currentCropIndex].cropped = croppedImage;
+        
+        updateImageThumbnails();
+        
+        cropper.destroy();
+        cropper = null;
+    }
     
-    const canvas = cropper.getCroppedCanvas({
-        width: 400,
-        height: 500
-    });
-    
-    const croppedImage = canvas.toDataURL('image/jpeg', 0.9);
-    
-    // Add to canvas data
-    canvasData[currentCropData.canvasIndex].images.push(croppedImage);
-    
-    // Update thumbnails
-    updateImageThumbnails(currentCropData.canvasIndex);
-    
-    // Close modal
-    cancelCrop();
+    document.getElementById('cropModal').style.display = 'none';
 }
 
-// Update image thumbnails
-function updateImageThumbnails(canvasIndex) {
-    const container = document.getElementById(`imageThumbnails-${canvasIndex}`);
-    container.innerHTML = '';
+// Update discount notification
+function updateDiscountNotification() {
+    const notification = document.getElementById('discountNotification');
+    const discountText = document.querySelector('.discount-text');
     
-    canvasData[canvasIndex].images.forEach((image, index) => {
-        const thumb = document.createElement('div');
-        thumb.className = 'image-thumb';
-        thumb.innerHTML = `
-            <img src="${image}" alt="Image ${index + 1}">
-            <button class="remove-image" onclick="removeImage(${canvasIndex}, ${index})">×</button>
+    if (canvasCount >= 5) {
+        notification.style.display = 'flex';
+        discountText.textContent = translations[currentLanguage].discount12 || 'You get 12% discount!';
+    } else if (canvasCount >= 3) {
+        notification.style.display = 'flex';
+        discountText.textContent = translations[currentLanguage].discount5 || 'You get 5% discount!';
+    } else {
+        notification.style.display = 'none';
+    }
+}
+
+// Calculate total price
+function calculateTotalPrice() {
+    let total = 0;
+    
+    // Save current canvas data
+    saveCanvasData(currentCanvasIndex);
+    
+    // Calculate price for each canvas
+    for (let i = 0; i < canvasCount; i++) {
+        const canvasData = getCanvasData(i);
+        if (canvasData.size) {
+            let canvasPrice = getBasePrice(canvasData.size);
+            
+            // Add collage price
+            if (canvasType === 'collage') {
+                canvasPrice += 5;
+            }
+            
+            // Add two person price
+            if (canvasData.twoPersonCanvas && canvasType !== 'collage') {
+                canvasPrice += 10;
+            }
+            
+            total += canvasPrice;
+        }
+    }
+    
+    // Apply discount
+    let discount = 0;
+    if (canvasCount >= 5) {
+        discount = 0.12; // 12% discount
+    } else if (canvasCount >= 3) {
+        discount = 0.05; // 5% discount
+    }
+    
+    const discountAmount = total * discount;
+    const finalTotal = total - discountAmount;
+    
+    return {
+        subtotal: total,
+        discount: discountAmount,
+        total: finalTotal
+    };
+}
+
+// Update total price display
+function updateTotalPrice() {
+    const priceInfo = calculateTotalPrice();
+    const totalPriceElement = document.getElementById('totalPrice');
+    
+    if (priceInfo.discount > 0) {
+        totalPriceElement.innerHTML = `
+            <span style="text-decoration: line-through; color: #999;">$${priceInfo.subtotal}</span>
+            <span style="color: #27ae60; font-weight: bold;">$${priceInfo.total.toFixed(2)}</span>
+            <span style="color: #e74c3c; font-size: 0.9em;">(Save $${priceInfo.discount.toFixed(2)})</span>
         `;
-        container.appendChild(thumb);
-    });
+    } else {
+        totalPriceElement.textContent = `$${priceInfo.total}`;
+    }
 }
 
-// Remove image
-function removeImage(canvasIndex, imageIndex) {
-    canvasData[canvasIndex].images.splice(imageIndex, 1);
-    updateImageThumbnails(canvasIndex);
+// Validate form
+function validateForm() {
+    let isValid = true;
+    const errors = [];
+    
+    // Save current canvas data
+    saveCanvasData(currentCanvasIndex);
+    
+    // Validate each canvas
+    for (let i = 0; i < canvasCount; i++) {
+        const canvasData = getCanvasData(i);
+        const canvasImages = uploadedImages[i] || [];
+        
+        // Check size
+        if (!canvasData.size) {
+            errors.push(`Canvas ${i + 1}: Please select a size`);
+            isValid = false;
+        }
+        
+        // Check images
+        if (canvasImages.length === 0) {
+            errors.push(`Canvas ${i + 1}: Please upload at least one image`);
+            isValid = false;
+        }
+    }
+    
+    // Validate customer info
+    const fbName = document.getElementById('fbName').value.trim();
+    const email = document.getElementById('email').value.trim();
+    
+    if (!fbName) {
+        document.getElementById('fbName-error').textContent = 'Facebook name is required';
+        isValid = false;
+    } else {
+        document.getElementById('fbName-error').textContent = '';
+    }
+    
+    if (!email || !isValidEmail(email)) {
+        document.getElementById('email-error').textContent = 'Valid email is required';
+        isValid = false;
+    } else {
+        document.getElementById('email-error').textContent = '';
+    }
+    
+    // Show first error if on multi canvas
+    if (errors.length > 0 && (canvasType === 'multi' || canvasType === 'collage')) {
+        alert(errors.join('\n'));
+    }
+    
+    return isValid;
+}
+
+// Validate email
+function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
 // Open preview modal
@@ -447,65 +848,36 @@ function openPreviewModal(canvasIndex) {
     // Clear canvas
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // Load background image
+    // Get canvas data
+    const canvasData = getCanvasData(currentCanvasIndex);
+    
+    // Load background image based on type
     const bgImage = new Image();
-    const isTwoPerson = canvasData[canvasIndex].twoPerson;
-    bgImage.src = isTwoPerson ? 'canvas-bg-couple.jpg' : 'canvas-bg-single.jpg';
+    const bgSrc = canvasData.twoPersonCanvas ? './canvas-bg-couple.jpg' : './canvas-bg-single.jpg';
     
     bgImage.onload = function() {
         // Draw background
         ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
         
-        // Draw preview notice in center
-        ctx.save();
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.fillRect(50, 200, 300, 100);
-        
-        ctx.fillStyle = '#333';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        
-        const notice = 'This is only a preview for your custom text.\nThe final canvas preview will be sent to\nyour email and Messenger.';
-        const lines = notice.split('\n');
-        lines.forEach((line, index) => {
-            ctx.fillText(line, 200, 230 + (index * 20));
-        });
-        ctx.restore();
-        
-        // Draw custom text
-        const customText = canvasData[canvasIndex].customText;
-        if (customText) {
-            ctx.save();
-            ctx.fillStyle = '#333';
+        // Draw text if provided
+        if (canvasData.customText) {
             ctx.font = 'bold 24px Arial';
+            ctx.fillStyle = '#333';
             ctx.textAlign = 'center';
-            ctx.fillText(customText, 200, 380);
-            ctx.restore();
+            ctx.fillText(canvasData.customText, canvas.width / 2, canvas.height - 100);
         }
         
-        // Draw date
-        const date = canvasData[canvasIndex].date;
-        if (date) {
-            ctx.save();
-            ctx.fillStyle = '#666';
+        // Draw date if provided
+        if (canvasData.date && canvasType !== 'collage') {
             ctx.font = '18px Arial';
+            ctx.fillStyle = '#666';
             ctx.textAlign = 'center';
-            ctx.fillText(date, 200, 420);
-            ctx.restore();
-        }
-        
-        // Draw welcome home if selected
-        if (canvasData[canvasIndex].welcomeHome) {
-            const welcomeImg = new Image();
-            welcomeImg.src = 'welcome-home-overlay.png';
-            welcomeImg.onload = function() {
-                ctx.drawImage(welcomeImg, 100, 50, 200, 50);
-            };
+            ctx.fillText(canvasData.date, canvas.width / 2, canvas.height - 60);
         }
     };
     
-    modal.style.display = 'block';
+    bgImage.src = bgSrc;
+    modal.style.display = 'flex';
 }
 
 // Close preview modal
@@ -513,162 +885,59 @@ function closePreviewModal() {
     document.getElementById('previewModal').style.display = 'none';
 }
 
-// Update total price
-function updateTotalPrice() {
-    let total = 0;
-    
-    // Calculate base price for all canvases
-    for (let i = 0; i < totalCanvases; i++) {
-        if (canvasData[i]) {
-            total += canvasData[i].price || 0;
-            if (canvasData[i].twoPerson) {
-                total += PRICES.twoPerson;
-            }
-        }
-    }
-    
-    // Apply discount
-    let discount = 0;
-    if (totalCanvases >= 5) {
-        discount = 0.12;
-    } else if (totalCanvases >= 3) {
-        discount = 0.05;
-    }
-    
-    const discountedTotal = total * (1 - discount);
-    
-    document.getElementById('totalPrice').textContent = `$${discountedTotal.toFixed(2)}`;
-}
-
-// Validate form
-function validateForm() {
-    let isValid = true;
-    const errors = [];
-    
-    // Save current canvas data
-    saveCurrentCanvasData();
-    
-    // Validate each canvas
-    for (let i = 0; i < totalCanvases; i++) {
-        const data = canvasData[i];
-        
-        // Check size
-        if (!data.size) {
-            document.getElementById(`size-error-${i}`).textContent = 'Please select a size';
-            document.getElementById(`size-error-${i}`).classList.add('show');
-            errors.push(`Canvas ${i + 1}: Please select a size`);
-            isValid = false;
-        }
-        
-        // Check images
-        if (data.images.length === 0) {
-            document.getElementById(`image-error-${i}`).textContent = 'Please upload at least one image';
-            document.getElementById(`image-error-${i}`).classList.add('show');
-            errors.push(`Canvas ${i + 1}: Please upload at least one image`);
-            isValid = false;
-        }
-    }
-    
-    // Validate customer info
-    const fbName = document.getElementById('fbName').value.trim();
-    const email = document.getElementById('email').value.trim();
-    
-    if (!fbName) {
-        document.getElementById('fbName-error').textContent = 'Please enter your Facebook name';
-        document.getElementById('fbName-error').classList.add('show');
-        isValid = false;
-    }
-    
-    if (!email || !isValidEmail(email)) {
-        document.getElementById('email-error').textContent = 'Please enter a valid email address';
-        document.getElementById('email-error').classList.add('show');
-        isValid = false;
-    }
-    
-    return { isValid, errors };
-}
-
-// Check valid email
-function isValidEmail(email) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-}
-
 // Confirm order
 function confirmOrder() {
-    const validation = validateForm();
-    
-    if (!validation.isValid) {
-        // If multi canvas, switch to first canvas with error
-        if (totalCanvases > 1 && validation.errors.length > 0) {
-            const firstError = validation.errors[0];
-            const canvasMatch = firstError.match(/Canvas (\d+)/);
-            if (canvasMatch) {
-                switchCanvas(parseInt(canvasMatch[1]) - 1);
-            }
-        }
+    if (!validateForm()) {
         return;
     }
     
     // Show confirmation modal
-    showOrderSummary();
-}
-
-// Show order summary
-function showOrderSummary() {
     const modal = document.getElementById('confirmModal');
     const summary = document.getElementById('orderSummary');
     
-    let html = '<div class="order-summary">';
+    // Build order summary
+    let summaryHTML = '<div class="order-details">';
+    summaryHTML += `<p><strong>Canvas Type:</strong> ${canvasType}</p>`;
+    
+    if (canvasType === 'multi' || canvasType === 'collage') {
+        summaryHTML += `<p><strong>Number of Canvas:</strong> ${canvasCount}</p>`;
+    }
     
     // Canvas details
-    for (let i = 0; i < totalCanvases; i++) {
-        const data = canvasData[i];
-        html += `
-            <div class="canvas-summary">
-                <h4>Canvas ${i + 1}</h4>
-                <p>Size: ${data.size} inches - $${data.price}</p>
-                ${data.twoPerson ? '<p>Two Person Canvas: +$10</p>' : ''}
-                <p>Images: ${data.images.length} uploaded</p>
-                ${data.customText ? `<p>Text: ${data.customText}</p>` : ''}
-                ${data.date ? `<p>Date: ${data.date}</p>` : ''}
-                ${data.welcomeHome ? '<p>Welcome Home: Yes</p>' : ''}
-            </div>
-        `;
+    for (let i = 0; i < canvasCount; i++) {
+        const canvasData = getCanvasData(i);
+        const images = uploadedImages[i] || [];
+        
+        summaryHTML += `<div class="canvas-summary">`;
+        summaryHTML += `<h4>Canvas ${i + 1}</h4>`;
+        summaryHTML += `<p>Size: ${canvasData.size}</p>`;
+        summaryHTML += `<p>Images: ${images.length}</p>`;
+        
+        if (canvasData.customText) {
+            summaryHTML += `<p>Text: ${canvasData.customText}</p>`;
+        }
+        
+        if (canvasData.twoPersonCanvas && canvasType !== 'collage') {
+            summaryHTML += `<p>Two Person Canvas: Yes</p>`;
+        }
+        
+        summaryHTML += `</div>`;
     }
     
-    // Customer info
-    html += `
-        <div class="customer-summary">
-            <h4>Customer Information</h4>
-            <p>Facebook Name: ${document.getElementById('fbName').value}</p>
-            <p>Email: ${document.getElementById('email').value}</p>
-        </div>
-    `;
+    // Price summary
+    const priceInfo = calculateTotalPrice();
+    summaryHTML += '<div class="price-summary">';
+    summaryHTML += `<p>Subtotal: $${priceInfo.subtotal}</p>`;
     
-    // Notes
-    const notes = document.getElementById('notes').value;
-    if (notes) {
-        html += `
-            <div class="notes-summary">
-                <h4>Additional Notes</h4>
-                <p>${notes}</p>
-            </div>
-        `;
+    if (priceInfo.discount > 0) {
+        summaryHTML += `<p>Discount: -$${priceInfo.discount.toFixed(2)}</p>`;
     }
     
-    // Total
-    const totalPrice = document.getElementById('totalPrice').textContent;
-    html += `
-        <div class="total-summary">
-            <h4>Total: ${totalPrice}</h4>
-            ${totalCanvases >= 3 ? '<p class="discount-applied">Discount applied!</p>' : ''}
-        </div>
-    `;
+    summaryHTML += `<p><strong>Total: $${priceInfo.total.toFixed(2)}</strong></p>`;
+    summaryHTML += '</div>';
     
-    html += '</div>';
-    
-    summary.innerHTML = html;
-    modal.style.display = 'block';
+    summary.innerHTML = summaryHTML;
+    modal.style.display = 'flex';
 }
 
 // Close confirm modal
@@ -677,94 +946,170 @@ function closeConfirmModal() {
 }
 
 // Submit order
-function submitOrder() {
-    // Prepare order data
-    const orderData = {
-        canvases: [],
-        customer: {
-            fbName: document.getElementById('fbName').value,
-            email: document.getElementById('email').value
-        },
-        notes: document.getElementById('notes').value,
-        totalPrice: document.getElementById('totalPrice').textContent,
-        timestamp: new Date().toISOString()
-    };
-    
-    // Add canvas data
-    for (let i = 0; i < totalCanvases; i++) {
-        orderData.canvases.push({
-            canvasNumber: i + 1,
-            size: canvasData[i].size,
-            price: canvasData[i].price,
-            twoPerson: canvasData[i].twoPerson,
-            images: canvasData[i].images,
-            customText: canvasData[i].customText,
-            date: canvasData[i].date,
-            welcomeHome: canvasData[i].welcomeHome
+async function submitOrder() {
+    try {
+        // Show loading state
+        showLoading('Processing your order...');
+        const submitBtn = document.querySelector('#confirmModal .primary-btn');
+        submitBtn.textContent = 'Processing...';
+        submitBtn.disabled = true;
+        
+        // Generate order ID
+        const orderId = generateOrderId();
+        
+        // Prepare canvas data for Apps Script
+        const canvasesData = [];
+        for (let i = 0; i < canvasCount; i++) {
+            const canvasData = getCanvasData(i);
+            const images = uploadedImages[i] || [];
+            
+            showLoading(`Processing canvas ${i + 1} of ${canvasCount}...`);
+            
+            // Convert images to base64 with compression
+            const base64Images = [];
+            for (const imageData of images) {
+                try {
+                    // Use cropped image if available, otherwise use original
+                    const imageToCompress = imageData.cropped || imageData.original;
+                    
+                    // Compress again before sending (ensure small size)
+                    const compressedBase64 = await compressBase64Image(imageToCompress, 1000, 0.75);
+                    
+                    // Remove data URL prefix
+                    const base64Only = compressedBase64.split(',')[1];
+                    base64Images.push(base64Only);
+                    
+                } catch (error) {
+                    console.error('Error compressing image for upload:', error);
+                }
+            }
+            
+            canvasesData.push({
+                canvas_id: i + 1,
+                canvas_type: canvasData.twoPersonCanvas ? 'couple' : 'single',
+                size: canvasData.size,
+                value: calculateCanvasPrice(canvasData),
+                images: base64Images,
+                custom_text: canvasData.customText,
+                date: canvasData.date,
+                welcome_home: canvasData.welcomeHome
+            });
+        }
+        
+        // Prepare data for Apps Script
+        const appsScriptData = {
+            order_id: orderId,
+            customer_info: {
+                fb_name: document.getElementById('fbName').value.trim(),
+                email: document.getElementById('email').value.trim(),
+                phone: document.getElementById('phone').value.trim()
+            },
+            canvases: canvasesData,
+            notes: document.getElementById('notes').value.trim()
+        };
+        
+        showLoading('Uploading to server...');
+        
+        // Send to Apps Script
+        const appsScriptUrl = 'https://script.google.com/macros/s/AKfycbygWj_cmQvy29D_K31Kci2g0iBIycf9he2SiRFuU3PsBznjofyZjjQZ-kmDAgRUOzAQ/exec';
+        const appsScriptResponse = await fetch(appsScriptUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(appsScriptData)
         });
+        
+        // Prepare data for N8N
+        const priceInfo = calculateTotalPrice();
+        const n8nData = {
+            order_id: orderId,
+            psid: urlParams.psid,
+            fb_name: document.getElementById('fbName').value.trim(),
+            first_name: document.getElementById('fbName').value.trim().split(' ')[0],
+            last_name: document.getElementById('fbName').value.trim().split(' ').slice(1).join(' '),
+            email: document.getElementById('email').value.trim(),
+            phone: document.getElementById('phone').value.trim(),
+            ref: urlParams.ref,
+            fbc: urlParams.fbc,
+            fbp: urlParams.fbp,
+            product: canvasType === 'collage' ? 'Collage Canvas' : 'Welcome Home Canvas',
+            canvas_type: canvasType,
+            canvas_count: canvasCount,
+            size: canvasCount === 1 ? getCanvasData(0).size : 'Multiple',
+            value: priceInfo.total,
+            currency: 'USD',
+            photo_links: '["Uploading to Google Drive..."]', // Will be updated by Apps Script
+            note: document.getElementById('notes').value.trim(),
+            submit_time: new Date().toLocaleString(),
+            status: 'pending'
+        };
+        
+        // Send to N8N
+        const n8nUrl = 'https://jm9611.duckdns.org/webhook/form-submit';
+        await fetch(n8nUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(n8nData)
+        });
+        
+        // Hide loading and show success
+        hideLoading();
+        showThankYouPage();
+        
+    } catch (error) {
+        console.error('Error submitting order:', error);
+        hideLoading();
+        alert('There was an error submitting your order. Please try again.');
+        
+        // Reset button
+        const submitBtn = document.querySelector('#confirmModal .primary-btn');
+        submitBtn.textContent = 'Confirm Order';
+        submitBtn.disabled = false;
+    }
+}
+
+// Generate order ID
+function generateOrderId() {
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 10000);
+    return `JM_${timestamp}_${random}`;
+}
+
+// Calculate canvas price
+function calculateCanvasPrice(canvasData) {
+    let price = getBasePrice(canvasData.size);
+    
+    if (canvasType === 'collage') {
+        price += 5;
     }
     
-    // Send order (you would implement the actual API call here)
-    console.log('Order submitted:', orderData);
+    if (canvasData.twoPersonCanvas && canvasType !== 'collage') {
+        price += 10;
+    }
     
-    // For now, just show thank you page
-    closeConfirmModal();
-    showThankYouPage();
+    return price;
 }
 
 // Show thank you page
 function showThankYouPage() {
+    document.getElementById('confirmModal').style.display = 'none';
+    document.querySelector('.container').style.display = 'none';
     document.getElementById('thankYouPage').style.display = 'flex';
 }
 
 // Start new order
 function startNewOrder() {
-    // Reset everything
-    canvasData = {};
-    currentCanvas = 0;
-    totalCanvases = 1;
-    
     // Reset form
-    document.getElementById('canvasType').value = 'single';
-    document.getElementById('canvasQuantity').value = '2';
-    document.getElementById('fbName').value = '';
-    document.getElementById('email').value = '';
-    document.getElementById('notes').value = '';
-    
-    // Hide thank you page
-    document.getElementById('thankYouPage').style.display = 'none';
-    
-    // Reinitialize
-    initializeCanvas(0);
-    handleCanvasTypeChange();
-    
-    // Clear all form fields
-    document.querySelectorAll('input[type="text"], input[type="email"], textarea').forEach(input => {
-        input.value = '';
-    });
-    document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
-        checkbox.checked = false;
-    });
-    document.querySelectorAll('.size-option').forEach(option => {
-        option.classList.remove('selected');
-    });
-    document.querySelectorAll('.selected-price').forEach(price => {
-        price.style.display = 'none';
-    });
-    document.querySelectorAll('.image-thumbnails').forEach(container => {
-        container.innerHTML = '';
-    });
-    document.querySelectorAll('.validation-error').forEach(error => {
-        error.textContent = '';
-        error.classList.remove('show');
-    });
-    
-    updateTotalPrice();
+    window.location.reload();
 }
 
 // FAQ functions
 function openFAQ() {
-    document.getElementById('faqModal').style.display = 'block';
+    document.getElementById('faqModal').style.display = 'flex';
 }
 
 function closeFAQ() {
@@ -773,34 +1118,43 @@ function closeFAQ() {
 
 function toggleFAQ(element) {
     const answer = element.nextElementSibling;
-    element.classList.toggle('active');
-    answer.classList.toggle('show');
+    const toggle = element.querySelector('.faq-toggle');
+    
+    if (answer.style.display === 'block') {
+        answer.style.display = 'none';
+        toggle.textContent = '+';
+    } else {
+        answer.style.display = 'block';
+        toggle.textContent = '-';
+    }
 }
 
-// Update language
-function updateLanguage() {
+// Language functions
+function setLanguage(lang) {
+    currentLanguage = lang;
+    localStorage.setItem('selectedLanguage', lang);
+    
+    // Update all translatable elements
     document.querySelectorAll('[data-translate]').forEach(element => {
         const key = element.getAttribute('data-translate');
-        if (translations[currentLanguage] && translations[currentLanguage][key]) {
-            element.textContent = translations[currentLanguage][key];
+        if (translations[lang] && translations[lang][key]) {
+            element.textContent = translations[lang][key];
         }
     });
     
+    // Update placeholders
     document.querySelectorAll('[data-translate-placeholder]').forEach(element => {
         const key = element.getAttribute('data-translate-placeholder');
-        if (translations[currentLanguage] && translations[currentLanguage][key]) {
-            element.placeholder = translations[currentLanguage][key];
+        if (translations[lang] && translations[lang][key]) {
+            element.placeholder = translations[lang][key];
         }
     });
+    
+    // Update dynamic content
+    updateDiscountNotification();
 }
 
-// Close modals when clicking outside
-window.onclick = function(event) {
-    if (event.target.classList.contains('modal')) {
-        event.target.style.display = 'none';
-        if (cropper) {
-            cropper.destroy();
-            cropper = null;
-        }
-    }
-}
+// Initialize character counters on load
+window.addEventListener('load', function() {
+    updateCharCount(0);
+});
