@@ -6,7 +6,7 @@ let cropper = null;
 let currentCropIndex = null;
 let currentCanvasIndex = null;
 let pendingFiles = [];
-let currentRotation = 0; // Already exists in your file
+let currentRotation = 0;
 
 // Price configuration
 const prices = {
@@ -18,6 +18,16 @@ const prices = {
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
+    // Load custom fonts
+    const textFont = new FontFace('CustomText', 'url(./assets/text-font.ttf)');
+    const dateFont = new FontFace('CustomDate', 'url(./assets/date-font.ttf)');
+    
+    Promise.all([textFont.load(), dateFont.load()]).then(fonts => {
+        fonts.forEach(font => document.fonts.add(font));
+    }).catch(err => {
+        console.log('Font loading failed, using fallback fonts');
+    });
+    
     // Get URL parameters
     const urlParams = new URLSearchParams(window.location.search);
     
@@ -27,11 +37,20 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('fbName').value = decodeURIComponent(fbName);
     }
     
-    // Initialize character counter
+    // Initialize character counter and live preview for canvas 0
     const customTextInput = document.getElementById('customText-0');
     if (customTextInput) {
         customTextInput.addEventListener('input', function() {
             updateCharCount(0);
+            updateLivePreview(0);
+        });
+    }
+    
+    // Initialize date input listener for canvas 0
+    const dateInput = document.getElementById('date-0');
+    if (dateInput) {
+        dateInput.addEventListener('input', function() {
+            updateLivePreview(0);
         });
     }
     
@@ -49,7 +68,42 @@ function updateCharCount(canvasIndex) {
     }
 }
 
-// Canvas type change handler - UPDATED
+// Update live preview
+function updateLivePreview(canvasIndex) {
+    const customText = document.getElementById(`customText-${canvasIndex}`)?.value || '';
+    const date = document.getElementById(`date-${canvasIndex}`)?.value || '';
+    const canvasType = document.getElementById('canvasType').value;
+    
+    const previewTextElement = document.getElementById(`previewText-${canvasIndex}`);
+    const previewDateElement = document.getElementById(`previewDate-${canvasIndex}`);
+    
+    if (previewTextElement) {
+        previewTextElement.textContent = customText || 'Your text will appear here';
+        previewTextElement.style.opacity = customText ? '1' : '0.5';
+    }
+    
+    if (previewDateElement && canvasType !== 'collage') {
+        previewDateElement.textContent = date || 'Date will appear here';
+        previewDateElement.style.opacity = date ? '1' : '0.5';
+    }
+}
+
+// Create live preview box
+function createLivePreviewBox(canvasIndex) {
+    const canvasType = document.getElementById('canvasType').value;
+    const isCollage = canvasType === 'collage';
+    
+    return `
+        <div class="form-section canvas-item live-preview-section" data-canvas="${canvasIndex}" style="display: none;">
+            <div class="live-preview-box ${isCollage ? 'collage-preview' : ''}" id="livePreview-${canvasIndex}" style="height: ${isCollage ? '50px' : '90px'};">
+                <div class="preview-text" id="previewText-${canvasIndex}">Your text will appear here</div>
+                ${!isCollage ? `<div class="preview-date" id="previewDate-${canvasIndex}">Date will appear here</div>` : ''}
+            </div>
+        </div>
+    `;
+}
+
+// Canvas type change handler
 function handleCanvasTypeChange() {
     const canvasType = document.getElementById('canvasType').value;
     const multiCanvasSection = document.getElementById('multiCanvasSection');
@@ -165,7 +219,7 @@ function resetToSingleCanvas() {
     calculateTotalPrice();
 }
 
-// Update canvas count - UPDATED
+// Update canvas count
 function updateCanvasCount() {
     const quantity = parseInt(document.getElementById('canvasQuantity').value);
     const canvasType = document.getElementById('canvasType').value;
@@ -254,11 +308,20 @@ function createCanvasItems(canvasIndex) {
     // Insert HTML
     container.insertAdjacentHTML('beforeend', html);
     
-    // Initialize character counter for new canvas
+    // Initialize character counter and live preview for new canvas
     const customTextInput = document.getElementById(`customText-${canvasIndex}`);
     if (customTextInput) {
         customTextInput.addEventListener('input', function() {
             updateCharCount(canvasIndex);
+            updateLivePreview(canvasIndex);
+        });
+    }
+    
+    // Initialize date input listener
+    const dateInput = document.getElementById(`date-${canvasIndex}`);
+    if (dateInput) {
+        dateInput.addEventListener('input', function() {
+            updateLivePreview(canvasIndex);
         });
     }
 }
@@ -329,7 +392,10 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
         <div class="form-section canvas-item" data-canvas="${canvasIndex}" style="display: none;">
             <div class="form-group">
                 <label data-translate="customText">Enter your text</label>
-                <input type="text" id="customText-${canvasIndex}" maxlength="50" placeholder="e.g., Forever Together" data-translate-placeholder="customTextPlaceholder">
+                <input type="text" id="customText-${canvasIndex}" maxlength="50" 
+                       placeholder="e.g., Forever Together" 
+                       data-translate-placeholder="customTextPlaceholder"
+                       oninput="updateCharCount(${canvasIndex}); updateLivePreview(${canvasIndex})">
                 <div class="char-counter">
                     <span id="charCount-${canvasIndex}">0</span>/50
                 </div>
@@ -337,13 +403,19 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
         </div>
     `;
     
+    // Live Preview Box
+    html += createLivePreviewBox(canvasIndex);
+    
     // Date (not for collage)
     if (!isCollage) {
         html += `
             <div class="form-section canvas-item" data-canvas="${canvasIndex}" id="dateSection-${canvasIndex}" style="display: none;">
                 <div class="form-group">
                     <label data-translate="date">Date</label>
-                    <input type="text" id="date-${canvasIndex}" placeholder="e.g., Dec 25, 2024" data-translate-placeholder="datePlaceholder">
+                    <input type="text" id="date-${canvasIndex}" 
+                           placeholder="e.g., Dec 25, 2024" 
+                           data-translate-placeholder="datePlaceholder"
+                           oninput="updateLivePreview(${canvasIndex})">
                 </div>
             </div>
         `;
@@ -360,15 +432,6 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
             </div>
         `;
     }
-    
-    // Preview Button
-    html += `
-        <div class="form-section canvas-item preview-button-section" data-canvas="${canvasIndex}" style="display: none;">
-            <button class="preview-btn" onclick="openPreviewModal(${canvasIndex})" data-translate="previewButton">
-                Preview Your Customize
-            </button>
-        </div>
-    `;
     
     return html;
 }
@@ -448,6 +511,9 @@ function restoreCanvasData(canvasIndex) {
     if (welcomeHomeCheckbox && data.welcomeHome !== undefined) {
         welcomeHomeCheckbox.checked = data.welcomeHome;
     }
+    
+    // Update live preview after restoring data
+    updateLivePreview(canvasIndex);
 }
 
 // Size selection
@@ -731,131 +797,6 @@ function updateThumbnails(canvasIndex) {
 function removeImage(canvasIndex, imageIndex) {
     uploadedImages[canvasIndex].splice(imageIndex, 1);
     updateThumbnails(canvasIndex);
-}
-
-// Open preview modal - UPDATED
-function openPreviewModal(canvasIndex) {
-    const modal = document.getElementById('previewModal');
-    const canvas = document.getElementById('previewCanvas');
-    const canvasType = document.getElementById('canvasType').value;
-    
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    
-    // Set canvas size based on type
-    if (canvasType === 'collage') {
-        canvas.width = 300;
-        canvas.height = 250;
-    } else {
-        canvas.width = 250;
-        canvas.height = 300;
-    }
-    
-    // Show loading
-    ctx.fillStyle = '#f0f0f0';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    ctx.fillStyle = '#666';
-    ctx.font = '14px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('Loading preview...', canvas.width/2, canvas.height/2);
-    
-    // Show modal
-    modal.style.display = 'block';
-    
-    // Load background
-    const isTwoPerson = document.getElementById(`twoPersonCanvas-${canvasIndex}`)?.checked;
-    const bgImage = new Image();
-    
-    // Determine background image
-    if (canvasType === 'single' || canvasType === 'multi') {
-        bgImage.src = isTwoPerson ? './assets/canvas-bg-couple.jpg' : './assets/canvas-bg-single.jpg';
-    } else {
-        bgImage.src = './assets/canvas-bg-collage.jpg';
-    }
-    
-    bgImage.onload = function() {
-        // Clear and draw background
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
-        
-        // Get text values
-        const customText = document.getElementById(`customText-${canvasIndex}`)?.value || '';
-        const date = document.getElementById(`date-${canvasIndex}`)?.value || '';
-        const welcomeHome = document.getElementById(`welcomeHome-${canvasIndex}`)?.checked;
-        
-        // Load custom fonts
-        const textFont = new FontFace('CustomText', 'url(./assets/text-font.ttf)');
-        const dateFont = new FontFace('CustomDate', 'url(./assets/date-font.ttf)');
-        
-        Promise.all([textFont.load(), dateFont.load()]).then(fonts => {
-            fonts.forEach(font => document.fonts.add(font));
-            
-            // Draw text in bottom left corner
-            ctx.fillStyle = '#000000';
-            ctx.textAlign = 'left';
-            
-            let yPosition = canvas.height - 20;
-            
-            // Draw date if exists (not for collage)
-            if (date && canvasType !== 'collage') {
-                ctx.font = '14px CustomDate';
-                ctx.fillText(date, 20, yPosition);
-                yPosition -= 25;
-            }
-            
-            // Draw custom text
-            if (customText) {
-                ctx.font = '18px CustomText';
-                ctx.fillText(customText, 20, yPosition);
-                yPosition -= 25;
-            }
-            
-            // Draw welcome home if checked (not for collage)
-            if (welcomeHome && canvasType !== 'collage') {
-                ctx.font = '16px CustomText';
-                ctx.fillText('Welcome Home', 20, yPosition);
-            }
-        }).catch(() => {
-            // Fallback if fonts fail to load
-            ctx.fillStyle = '#000000';
-            ctx.textAlign = 'left';
-            ctx.font = '18px Arial';
-            
-            let yPosition = canvas.height - 20;
-            
-            if (date && canvasType !== 'collage') {
-                ctx.font = '14px Arial';
-                ctx.fillText(date, 20, yPosition);
-                yPosition -= 25;
-            }
-            
-            if (customText) {
-                ctx.font = '18px Arial';
-                ctx.fillText(customText, 20, yPosition);
-                yPosition -= 25;
-            }
-            
-            if (welcomeHome && canvasType !== 'collage') {
-                ctx.font = '16px Arial';
-                ctx.fillText('Welcome Home', 20, yPosition);
-            }
-        });
-    };
-    
-    bgImage.onerror = function() {
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-        ctx.fillStyle = '#999';
-        ctx.font = '14px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Preview unavailable', canvas.width/2, canvas.height/2);
-    };
-}
-
-// Close preview modal
-function closePreviewModal() {
-    document.getElementById('previewModal').style.display = 'none';
 }
 
 // Validate form with error modal
@@ -1310,6 +1251,17 @@ function startNewOrder() {
     // Update character counters
     document.querySelectorAll('[id^="charCount-"]').forEach(counter => {
         counter.textContent = '0';
+    });
+    
+    // Reset live previews
+    document.querySelectorAll('[id^="previewText-"]').forEach(preview => {
+        preview.textContent = 'Your text will appear here';
+        preview.style.opacity = '0.5';
+    });
+    
+    document.querySelectorAll('[id^="previewDate-"]').forEach(preview => {
+        preview.textContent = 'Date will appear here';
+        preview.style.opacity = '0.5';
     });
     
     // Calculate total

@@ -39,11 +39,6 @@ const translations = {
         // Welcome Home
         welcomeHome: "Welcome Home",
         
-        // Preview
-        previewButton: "Preview Your Customize",
-        previewTitle: "Canvas Preview",
-        closePreview: "Close Preview",
-        
         // Notes
         notes: "Additional Notes",
         notesPlaceholder: "Special instructions...",
@@ -149,11 +144,6 @@ const translations = {
         
         // Welcome Home
         welcomeHome: "Chào Mừng Về Nhà",
-        
-        // Preview
-        previewButton: "Xem Trước Thiết Kế",
-        previewTitle: "Xem Trước Canvas",
-        closePreview: "Đóng Xem Trước",
         
         // Notes
         notes: "Ghi Chú Thêm",

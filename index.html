@@ -149,10 +149,18 @@
                     <div class="form-section canvas-item" data-canvas="0">
                         <div class="form-group">
                             <label data-translate="customText">Enter your text</label>
-                            <input type="text" id="customText-0" maxlength="50" placeholder="e.g., Forever Together" data-translate-placeholder="customTextPlaceholder">
+                            <input type="text" id="customText-0" maxlength="50" placeholder="e.g., Forever Together" data-translate-placeholder="customTextPlaceholder" oninput="updateCharCount(0); updateLivePreview(0)">
                             <div class="char-counter">
                                 <span id="charCount-0">0</span>/50
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Live Preview Box for Canvas 0 -->
+                    <div class="form-section canvas-item live-preview-section" data-canvas="0">
+                        <div class="live-preview-box" id="livePreview-0" style="height: 90px;">
+                            <div class="preview-text" id="previewText-0" style="opacity: 0.5;">Your text will appear here</div>
+                            <div class="preview-date" id="previewDate-0" style="opacity: 0.5;">Date will appear here</div>
                         </div>
                     </div>
 
@@ -160,7 +168,7 @@
                     <div class="form-section canvas-item" data-canvas="0" id="dateSection-0">
                         <div class="form-group">
                             <label data-translate="date">Date</label>
-                            <input type="text" id="date-0" placeholder="e.g., Dec 25, 2024" data-translate-placeholder="datePlaceholder">
+                            <input type="text" id="date-0" placeholder="e.g., Dec 25, 2024" data-translate-placeholder="datePlaceholder" oninput="updateLivePreview(0)">
                         </div>
                     </div>
 
@@ -170,11 +178,6 @@
                             <input type="checkbox" id="welcomeHome-0">
                             <label for="welcomeHome-0" data-translate="welcomeHome">Welcome Home</label>
                         </div>
-                    </div>
-
-                    <!-- Preview Button -->
-                    <div class="form-section canvas-item preview-button-section" data-canvas="0">
-                        <button class="preview-btn" onclick="openPreviewModal(0)" data-translate="previewButton">Preview Your Customize</button>
                     </div>
 
                 </div>
@@ -338,22 +341,6 @@
         </div>
     </div>
 
-    <!-- Preview Modal -->
-    <div id="previewModal" class="modal">
-        <div class="modal-content preview-modal-content">
-            <div class="modal-header">
-                <h3 data-translate="previewTitle">Canvas Preview</h3>
-                <span class="close" onclick="closePreviewModal()">&times;</span>
-            </div>
-            <div class="preview-container">
-                <canvas id="previewCanvas" width="400" height="500"></canvas>
-            </div>
-            <div class="preview-footer">
-                <button onclick="closePreviewModal()" class="primary-btn" data-translate="closePreview">Close Preview</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Confirmation Modal -->
     <div id="confirmModal" class="modal">
         <div class="modal-content confirm-content">
@@ -414,6 +401,22 @@
             document.querySelectorAll('[id^="twoPersonSection-"]').forEach(section => {
                 section.style.display = isCollage ? 'none' : 'block';
             });
+            
+            // Update live preview for collage
+            const livePreviewBox = document.getElementById('livePreview-0');
+            if (livePreviewBox) {
+                if (isCollage) {
+                    livePreviewBox.style.height = '50px';
+                    livePreviewBox.classList.add('collage-preview');
+                    const datePreview = document.getElementById('previewDate-0');
+                    if (datePreview) datePreview.style.display = 'none';
+                } else {
+                    livePreviewBox.style.height = '90px';
+                    livePreviewBox.classList.remove('collage-preview');
+                    const datePreview = document.getElementById('previewDate-0');
+                    if (datePreview) datePreview.style.display = 'block';
+                }
+            }
         }
     </script>
     <script src="translations.js"></script>
