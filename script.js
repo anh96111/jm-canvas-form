@@ -16,6 +16,14 @@ const prices = {
     '20x30': 82
 };
 
+// Original price configuration - ADDED
+const originalPrices = {
+    '8x10': 54,
+    '11x14': 69,
+    '16x20': 79,
+    '20x30': 115
+};
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     // Load custom fonts
@@ -633,23 +641,32 @@ function handleTwoPersonChange(canvasIndex) {
     updatePriceDisplay(canvasIndex);
 }
 
-// Update price display
+// Update price display - UPDATED
 function updatePriceDisplay(canvasIndex) {
     const size = selectedSizes[canvasIndex];
     const priceElement = document.getElementById(`selectedPrice-${canvasIndex}`);
     
     if (!size || !priceElement) return;
     
+    const originalPrice = originalPrices[size];
     const basePrice = prices[size];
     const isTwoPerson = document.getElementById(`twoPersonCanvas-${canvasIndex}`)?.checked;
     const canvasType = document.getElementById('canvasType').value;
     
-    let priceHTML = `Price: $${basePrice}`;
+    let finalPrice = basePrice;
+    let priceHTML = '';
     
     if (canvasType === 'collage') {
-        priceHTML += ` + $5 (collage) = $${basePrice + 5}`;
+        finalPrice += 5;
+        const savings = originalPrice - finalPrice;
+        priceHTML = `Price: <span class="original-price">$${originalPrice}</span> $${finalPrice} <span class="save-amount">(Save $${savings})</span>`;
     } else if (isTwoPerson) {
-        priceHTML += ` + $10 (2 people) = $${basePrice + 10}`;
+        finalPrice += 10;
+        const savings = originalPrice - finalPrice;
+        priceHTML = `Price: <span class="original-price">$${originalPrice}</span> $${finalPrice} <span class="save-amount">(Save $${savings})</span>`;
+    } else {
+        const savings = originalPrice - basePrice;
+        priceHTML = `Price: <span class="original-price">$${originalPrice}</span> $${basePrice} <span class="save-amount">(Save $${savings})</span>`;
     }
     
     priceElement.innerHTML = priceHTML;
@@ -658,14 +675,19 @@ function updatePriceDisplay(canvasIndex) {
     calculateTotalPrice();
 }
 
-// Calculate total price
+// Calculate total price - UPDATED
 function calculateTotalPrice() {
     let total = 0;
+    let originalTotal = 0;
     const canvasType = document.getElementById('canvasType').value;
     const canvasCount = canvasType === 'single' ? 1 : parseInt(document.getElementById('canvasQuantity').value);
     
     for (let i = 0; i < canvasCount; i++) {
         if (selectedSizes[i]) {
+            // Calculate original price
+            originalTotal += originalPrices[selectedSizes[i]];
+            
+            // Calculate discounted price
             let canvasPrice = prices[selectedSizes[i]];
             
             // Add collage fee
@@ -684,13 +706,26 @@ function calculateTotalPrice() {
     }
     
     // Apply discount for multi canvas
+    let discountPercent = 0;
     if (canvasCount >= 5) {
         total = total * 0.88; // 12% off
+        discountPercent = 12;
     } else if (canvasCount >= 3) {
         total = total * 0.95; // 5% off
+        discountPercent = 5;
     }
     
-    document.getElementById('totalPrice').textContent = `$${Math.round(total)}`;
+    const finalTotal = Math.round(total);
+    const totalSavings = originalTotal - finalTotal;
+    
+    let priceHTML = '';
+    if (discountPercent > 0) {
+        priceHTML = `<span class="original-total">$${originalTotal}</span> $${finalTotal} <span class="discount-info">(${discountPercent}% OFF)</span> <span class="save-info">Save $${totalSavings}</span>`;
+    } else {
+        priceHTML = `<span class="original-total">$${originalTotal}</span> $${finalTotal} <span class="save-info">Save $${totalSavings}</span>`;
+    }
+    
+    document.getElementById('totalPrice').innerHTML = priceHTML;
 }
 
 // Update discount notification
@@ -1065,7 +1100,7 @@ function confirmOrder() {
     document.getElementById('confirmModal').style.display = 'block';
 }
 
-// Generate order summary
+// Generate order summary - UPDATED
 function generateOrderSummary() {
     const canvasType = document.getElementById('canvasType').value;
     const canvasCount = canvasType === 'single' ? 1 : parseInt(document.getElementById('canvasQuantity').value);
@@ -1108,8 +1143,9 @@ function generateOrderSummary() {
         summary += `<p>Phone: ${phone}</p>`;
     }
     
-    // Total price
-    summary += `<h4>Total Price: ${document.getElementById('totalPrice').textContent}</h4>`;
+    // Total price - Use innerHTML to preserve formatting
+    const totalPriceElement = document.getElementById('totalPrice');
+    summary += `<h4>Total Price: ${totalPriceElement.innerHTML}</h4>`;
     
     summary += '</div>';
     
@@ -1178,7 +1214,7 @@ async function prepareFormData() {
         phone: document.getElementById('phone').value || '',
         notes: document.getElementById('notes').value || '',
         
-                // Canvas info
+        // Canvas info
         canvasType: canvasType,
         canvasCount: canvasCount,
         totalPrice: document.getElementById('totalPrice').textContent,

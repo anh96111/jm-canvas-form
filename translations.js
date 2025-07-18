@@ -106,110 +106,110 @@ const translations = {
         apply: "Apply Crop"
     },
     
-    vi: {
+    es: {
         // Header
-        promoText: "🎁 Ưu đãi đặc biệt: Đặt 3+ canvas giảm 5%! Đặt 5+ canvas giảm 12%! 🎁",
+        promoText: "🎁 Oferta Especial: ¡Ordena 3+ lienzos y obtén 5% de descuento! ¡Ordena 5+ lienzos y obtén 12% de descuento! 🎁",
         
         // Canvas Type
-        canvasType: "Chọn Loại Canvas",
-        singleCanvas: "Canvas Đơn",
-        multiCanvas: "Nhiều Canvas Khác Nhau",
-        collageCanvas: "Ghép Nhiều Ảnh",
+        canvasType: "Seleccionar Tipo de Lienzo",
+        singleCanvas: "Lienzo Individual",
+        multiCanvas: "Múltiples Lienzos Diferentes",
+        collageCanvas: "Collage de Múltiples Imágenes",
         faqButton: "?",
         
         // Canvas Quantity
-        selectQuantity: "Bạn muốn bao nhiêu canvas khác nhau?",
-        collageQuantity: "Bạn muốn bao nhiêu canvas để ghép?",
-        discountText: "Bạn được giảm giá!",
+        selectQuantity: "¿Cuántos lienzos diferentes?",
+        collageQuantity: "¿Cuántos lienzos para el collage?",
+        discountText: "¡Tienes descuento!",
         
         // Size Selection
-        selectSize: "Chọn Kích Thước *",
-        bestSeller: "Bán Chạy Nhất",
+        selectSize: "Seleccionar Tamaño *",
+        bestSeller: "Más Vendido",
         
         // Two Person Canvas
-        twoPersonLabel: "2 người trên 1 canvas (+$10)",
+        twoPersonLabel: "2 personas en 1 lienzo (+$10)",
         
         // Image Upload
-        uploadImages: "Tải Ảnh Lên *",
-        uploadText: "Nhấn để tải ảnh lên (Tối đa 6)",
-        uploadSubtext: "Hỗ trợ JPG, PNG - Sẽ được cắt theo tỷ lệ 8:10",
+        uploadImages: "Subir Imágenes *",
+        uploadText: "Haz clic para subir imágenes (Máx. 6)",
+        uploadSubtext: "Admite JPG, PNG - Se recortará a proporción 8:10",
         
         // Custom Text
-        customText: "Nhập văn bản của bạn",
-        customTextPlaceholder: "Ví dụ: Mãi Bên Nhau",
+        customText: "Ingresa tu texto",
+        customTextPlaceholder: "ej., Juntos Para Siempre",
         
         // Date
-        date: "Ngày",
-        datePlaceholder: "Ví dụ: 25/12/2024",
+        date: "Fecha",
+        datePlaceholder: "ej., Dic 25, 2024",
         
         // Welcome Home
-        welcomeHome: "Chào Mừng Về Nhà",
+        welcomeHome: "Bienvenido a Casa",
         
         // Notes
-        notes: "Ghi Chú Thêm",
-        notesPlaceholder: "Yêu cầu đặc biệt...",
+        notes: "Notas Adicionales",
+        notesPlaceholder: "Instrucciones especiales...",
         
         // Customer Info
-        customerInfo: "Thông Tin Khách Hàng",
-        fbName: "Tên Facebook của bạn *",
-        fbNamePlaceholder: "Nhập tên Facebook của bạn",
-        email: "Email *",
-        emailPlaceholder: "email@example.com",
-        phone: "Số điện thoại",
-        phonePlaceholder: "Nhập số điện thoại (không bắt buộc)",
+        customerInfo: "Información del Cliente",
+        fbName: "Tu nombre de Facebook *",
+        fbNamePlaceholder: "Ingresa tu nombre de Facebook",
+        email: "Correo electrónico *",
+        emailPlaceholder: "tu@correo.com",
+        phone: "Número de teléfono",
+        phonePlaceholder: "Ingresa tu número de teléfono (opcional)",
         
         // Price
-        estimatedTotal: "Tổng Ước Tính",
+        estimatedTotal: "Total Estimado",
         
         // Submit
-        submit: "Gửi Đơn Hàng",
+        submit: "Enviar Pedido",
         
         // Confirmation Modal
-        confirmOrder: "Xem Lại Đơn Hàng",
-        goBack: "Quay Lại",
-        confirmSubmit: "Xác Nhận Đơn Hàng",
+        confirmOrder: "Revisar Tu Pedido",
+        goBack: "Regresar",
+        confirmSubmit: "Confirmar Pedido",
         
         // Thank You Page
-        thankYouTitle: "Cảm Ơn Bạn!",
-        thankYouMessage: "Đơn hàng của bạn đã được nhận thành công. Chúng tôi sẽ gửi bản xem trước canvas đến email và Messenger của bạn trong vòng 2-3 ngày làm việc.",
-        newOrder: "Đặt Đơn Hàng Khác",
+        thankYouTitle: "¡Gracias!",
+        thankYouMessage: "Tu pedido ha sido recibido exitosamente. Te enviaremos una vista previa de tu lienzo por correo electrónico y Messenger dentro de 2-3 días hábiles.",
+        newOrder: "Hacer Otro Pedido",
         
         // FAQ Modal
-        faqTitle: "Câu Hỏi Thường Gặp",
-        shippingTitle: "🚚 <strong>Vận Chuyển</strong>",
-        deliveryTime: "<strong>Thời Gian Giao Hàng:</strong>",
-        usDelivery: "Mỹ: 5–10 ngày làm việc",
-        intlDelivery: "Quốc tế: 7–15 ngày làm việc",
-        orderTracking: "<strong>Theo Dõi Đơn Hàng:</strong> Gửi qua email tự động sau khi mua",
-        securePackaging: "<strong>Đóng Gói An Toàn:</strong> Chống sốc, chống ẩm, sẵn sàng làm quà",
+        faqTitle: "Preguntas Frecuentes",
+        shippingTitle: "🚚 <strong>Envío</strong>",
+        deliveryTime: "<strong>Tiempo de Entrega:</strong>",
+        usDelivery: "EE.UU.: 5–10 días hábiles",
+        intlDelivery: "Internacional: 7–15 días hábiles",
+        orderTracking: "<strong>Seguimiento del Pedido:</strong> Enviado por correo electrónico automáticamente después de la compra",
+        securePackaging: "<strong>Embalaje Seguro:</strong> Resistente a golpes, a prueba de humedad y listo para regalo",
         
-        paymentTitle: "💳 <strong>Thanh Toán</strong>",
-        acceptedMethods: "<strong>Phương Thức Chấp Nhận:</strong>",
-        creditCards: "Thẻ Tín Dụng / Ghi Nợ",
+        paymentTitle: "💳 <strong>Pago</strong>",
+        acceptedMethods: "<strong>Métodos Aceptados:</strong>",
+        creditCards: "Tarjetas de Crédito / Débito",
         paypal: "PayPal",
         applePay: "Apple Pay",
-        secureCheckout: "<strong>Thanh Toán An Toàn:</strong> Tất cả thanh toán được mã hóa và xử lý an toàn",
-        fastEasy: "<strong>Nhanh & Dễ Dàng:</strong> Không cần tài khoản — chỉ vài bước nhanh chóng",
+        secureCheckout: "<strong>Pago Seguro:</strong> Todos los pagos están encriptados y se procesan de forma segura",
+        fastEasy: "<strong>Rápido y Fácil:</strong> No necesitas cuenta — solo unos pocos pasos rápidos",
         
-        howItWorksTitle: "🧑‍🎨 <strong>Cách Thức Hoạt Động</strong>",
-        noLivePreview: "Canvas này không hỗ trợ xem trước trực tiếp — nhưng đừng lo!",
-        designerEnhance: "✅ Nhà thiết kế của chúng tôi sẽ chỉnh sửa ảnh của bạn đẹp nhất.",
-        completeDetails: "📝 Sau khi bạn hoàn thành chi tiết canvas,",
-        emailPreview: "📩 Bạn sẽ nhận được bản xem trước qua email trong vòng 1–2 ngày làm việc.",
-        requestEdits: "🖼️ Bạn có thể yêu cầu chỉnh sửa cho đến khi hoàn toàn hài lòng.",
-        finalizeOrder: "✅ Hoàn tất đơn hàng và chúng tôi sẽ lo phần còn lại.",
+        howItWorksTitle: "🧑‍🎨 <strong>Cómo Funciona</strong>",
+        noLivePreview: "Este lienzo no admite vistas previas en vivo — ¡pero no te preocupes!",
+        designerEnhance: "✅ Nuestros diseñadores mejorarán tu foto para que luzca lo mejor posible.",
+        completeDetails: "📝 Una vez que hayas completado los detalles del lienzo,",
+        emailPreview: "📩 Recibirás una vista previa por correo electrónico dentro de 1–2 días hábiles.",
+        requestEdits: "🖼️ Puedes solicitar ediciones hasta que estés completamente satisfecho.",
+        finalizeOrder: "✅ Finaliza tu pedido y nosotros nos encargamos del resto.",
         
-        backToForm: "Quay Lại Form",
+        backToForm: "Volver al Formulario",
         
         // Error Modal
-        validationErrors: "Lỗi Xác Thực",
-        fixErrors: "Vui lòng sửa các lỗi sau:",
-        goToError: "Đến Lỗi Đầu Tiên",
+        validationErrors: "Errores de Validación",
+        fixErrors: "Por favor corrige los siguientes errores:",
+        goToError: "Ir al Primer Error",
         
         // Crop Modal
-        cropImage: "Cắt Ảnh Của Bạn",
-        cancel: "Hủy",
-        apply: "Áp Dụng"
+        cropImage: "Recortar Tu Imagen",
+        cancel: "Cancelar",
+        apply: "Aplicar Recorte"
     }
 };
 
@@ -234,11 +234,19 @@ function applyTranslations() {
     });
 }
 
-// Switch language
+// Switch language - UPDATED with active state fix
 function switchLanguage(lang) {
     currentLanguage = lang;
     localStorage.setItem('selectedLanguage', lang);
     applyTranslations();
+    
+    // Update active state for language buttons
+    document.querySelectorAll('.language-switcher button').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.textContent === lang.toUpperCase()) {
+            btn.classList.add('active');
+        }
+    });
 }
 
 // Initialize translations on page load
@@ -249,7 +257,7 @@ document.addEventListener('DOMContentLoaded', function() {
         switcher.className = 'language-switcher';
         switcher.innerHTML = `
             <button onclick="switchLanguage('en')" class="${currentLanguage === 'en' ? 'active' : ''}">EN</button>
-            <button onclick="switchLanguage('vi')" class="${currentLanguage === 'vi' ? 'active' : ''}">VI</button>
+            <button onclick="switchLanguage('es')" class="${currentLanguage === 'es' ? 'active' : ''}">ES</button>
         `;
         document.body.appendChild(switcher);
     }
