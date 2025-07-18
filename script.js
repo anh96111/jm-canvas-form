@@ -103,6 +103,30 @@ function createLivePreviewBox(canvasIndex) {
     `;
 }
 
+// THÊM function mới để update preview cho canvas 0
+function updateCanvas0Preview() {
+    const canvasType = document.getElementById('canvasType').value;
+    const isCollage = canvasType === 'collage';
+    const livePreviewBox = document.getElementById('livePreview-0');
+    const datePreview = document.getElementById('previewDate-0');
+    
+    if (livePreviewBox) {
+        if (isCollage) {
+            livePreviewBox.style.height = '50px';
+            livePreviewBox.classList.add('collage-preview');
+            if (datePreview) {
+                datePreview.style.display = 'none';
+            }
+        } else {
+            livePreviewBox.style.height = '90px';
+            livePreviewBox.classList.remove('collage-preview');
+            if (datePreview) {
+                datePreview.style.display = 'block';
+            }
+        }
+    }
+}
+
 // Canvas type change handler - UPDATED
 function handleCanvasTypeChange() {
     const canvasType = document.getElementById('canvasType').value;
@@ -171,6 +195,14 @@ function handleCanvasTypeChange() {
     
     // Update field visibility for collage
     updateCollageFields();
+    
+    // THÊM: Update live preview for canvas 0
+    updateCanvas0Preview();
+    
+    // FIXED: Force update current canvas view
+    if (currentCanvasIndex !== null && currentCanvasIndex !== undefined) {
+        switchCanvas(currentCanvasIndex);
+    }
 }
 
 // Update fields for collage
@@ -224,6 +256,18 @@ function resetToSingleCanvas() {
     firstCanvasItems.forEach(item => {
         item.style.display = 'block';
     });
+    
+    // THÊM: Reset preview cho canvas 0
+    const livePreviewBox = document.getElementById('livePreview-0');
+    const datePreview = document.getElementById('previewDate-0');
+    
+    if (livePreviewBox) {
+        livePreviewBox.style.height = '90px';
+        livePreviewBox.classList.remove('collage-preview');
+        if (datePreview) {
+            datePreview.style.display = 'block';
+        }
+    }
     
     calculateTotalPrice();
 }
@@ -306,10 +350,8 @@ function updateCanvasCount() {
         currentCanvasIndex = 0;
     }
     
-    // FIXED: Show first canvas with proper data restore using setTimeout
-    setTimeout(() => {
-        switchCanvas(currentCanvasIndex);
-    }, 0);
+    // FIXED: Show first canvas directly without setTimeout
+    switchCanvas(currentCanvasIndex);
     
     calculateTotalPrice();
     
@@ -458,7 +500,7 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
     return html;
 }
 
-// Switch between canvases
+// Switch between canvases - UPDATED
 function switchCanvas(index) {
     // Update active tab
     document.querySelectorAll('.tab').forEach((tab, i) => {
@@ -478,6 +520,31 @@ function switchCanvas(index) {
     document.querySelectorAll(`[data-canvas="${index}"]`).forEach(item => {
         item.style.display = 'block';
     });
+    
+    // FIXED: Hide collage-specific fields after showing canvas items
+    const canvasType = document.getElementById('canvasType').value;
+    if (canvasType === 'collage') {
+        // Hide fields that shouldn't show for collage
+        const dateSection = document.getElementById(`dateSection-${index}`);
+        const welcomeSection = document.getElementById(`welcomeHomeSection-${index}`);
+        const twoPersonSection = document.getElementById(`twoPersonSection-${index}`);
+        
+        if (dateSection) dateSection.style.display = 'none';
+        if (welcomeSection) welcomeSection.style.display = 'none';
+        if (twoPersonSection) twoPersonSection.style.display = 'none';
+        
+        // THÊM: Update preview box cho canvas hiện tại
+        const livePreviewBox = document.getElementById(`livePreview-${index}`);
+        const datePreview = document.getElementById(`previewDate-${index}`);
+        
+        if (livePreviewBox) {
+            livePreviewBox.style.height = '50px';
+            livePreviewBox.classList.add('collage-preview');
+            if (datePreview) {
+                datePreview.style.display = 'none';
+            }
+        }
+    }
     
     // Update current canvas number
     document.getElementById('currentCanvasNum').textContent = index + 1;
@@ -1111,7 +1178,7 @@ async function prepareFormData() {
         phone: document.getElementById('phone').value || '',
         notes: document.getElementById('notes').value || '',
         
-        // Canvas info
+                // Canvas info
         canvasType: canvasType,
         canvasCount: canvasCount,
         totalPrice: document.getElementById('totalPrice').textContent,
