@@ -34,10 +34,10 @@
         <div class="promo-banner">
             <div class="promo-track">
                 <div class="promo-text">
-                    <span data-translate="promoText">🎁 Special Offer: Order 3+ canvas and get 5% OFF! Order 5+ canvas and get 12% OFF! 🎁</span>
+                    <span>🎁 Special Offer: Order 3+ canvas and get 5% OFF! Order 5+ canvas and get 12% OFF! 🎁</span>
                 </div>
                 <div class="promo-text">
-                    <span data-translate="promoText">🎁 Special Offer: Order 3+ canvas and get 5% OFF! Order 5+ canvas and get 12% OFF! 🎁</span>
+                    <span>🎁 Special Offer: Order 3+ canvas and get 5% OFF! Order 5+ canvas and get 12% OFF! 🎁</span>
                 </div>
             </div>
         </div>
@@ -50,21 +50,21 @@
                 <!-- Canvas Type Selection with FAQ Button -->
                 <div class="form-section">
                     <div class="section-header">
-                        <h2 data-translate="canvasType">Select Canvas Type</h2>
-                        <button class="faq-button" onclick="openFAQ()" data-translate="faqButton">?</button>
+                        <h2>Select Canvas Type</h2>
+                        <button class="faq-button" onclick="openFAQ()">?</button>
                     </div>
                     <div class="form-group">
                         <select id="canvasType" class="enhanced-select" onchange="handleCanvasTypeChange()">
-                            <option value="single" data-translate="singleCanvas">Single Canvas</option>
-                            <option value="multi" data-translate="multiCanvas">Multiple Different Canvas</option>
-                            <option value="collage" data-translate="collageCanvas">Collage Multiple Images</option>
+                            <option value="single">Single Canvas</option>
+                            <option value="multi">Multiple Different Canvas</option>
+                            <option value="collage">Collage Multiple Images</option>
                         </select>
                     </div>
                     
                     <!-- Multi Canvas Quantity (hidden by default) -->
                     <div id="multiCanvasSection" style="display: none;">
                         <div class="form-group">
-                            <label data-translate="selectQuantity">How many different canvas?</label>
+                            <label>How many different canvas?</label>
                             <select id="canvasQuantity" class="enhanced-select" onchange="updateCanvasCount()">
                                 <option value="2">2 Canvas</option>
                                 <option value="3">3 Canvas</option>
@@ -79,7 +79,7 @@
                         </div>
                         <div id="discountNotification" class="discount-notification" style="display: none;">
                             <span class="discount-icon">🎉</span>
-                            <span class="discount-text" data-translate="discountText"></span>
+                            <span class="discount-text"></span>
                         </div>
                     </div>
                 </div>
@@ -94,7 +94,7 @@
                     
                     <!-- Size Selection -->
                     <div class="form-section canvas-item" data-canvas="0">
-                        <h2 data-translate="selectSize">Select Size *</h2>
+                        <h2>Select Size *</h2>
                         <div class="size-grid">
                             <div class="size-option" data-size="8x10" onclick="selectSize('8x10', 0)">
                                 <div class="size-display">8x10 inches</div>
@@ -102,7 +102,7 @@
                             </div>
                             <div class="size-option" data-size="11x14" onclick="selectSize('11x14', 0)">
                                 <div class="size-display">11x14 inches</div>
-                                <div class="best-seller" data-translate="bestSeller">Best Seller</div>
+                                <div class="best-seller">Best Seller</div>
                                 <div class="collage-price" style="display: none;">+$5 for collage</div>
                             </div>
                             <div class="size-option" data-size="16x20" onclick="selectSize('16x20', 0)">
@@ -122,18 +122,18 @@
                     <div class="form-section canvas-item" data-canvas="0" id="twoPersonSection-0">
                         <div class="checkbox-wrapper">
                             <input type="checkbox" id="twoPersonCanvas-0" onchange="handleTwoPersonChange(0)">
-                            <label for="twoPersonCanvas-0" data-translate="twoPersonLabel">2 people on 1 canvas (+$10)</label>
+                            <label for="twoPersonCanvas-0">2 people on 1 canvas (+$10)</label>
                         </div>
                     </div>
 
                     <!-- Image Upload Section -->
                     <div class="form-section canvas-item" data-canvas="0">
-                        <h2 data-translate="uploadImages">Upload Images *</h2>
+                        <h2>Upload Images *</h2>
                         <div class="upload-container">
                             <div class="upload-area" onclick="triggerFileInput(0)">
                                 <div class="upload-icon">📷</div>
-                                <div class="upload-text" data-translate="uploadText">Click to upload images (Max 6)</div>
-                                <div class="upload-subtext" data-translate="uploadSubtext">Supports JPG, PNG - Will be cropped to 8:10 ratio</div>
+                                <div class="upload-text">Click to upload images (Max 6)</div>
+                                <div class="upload-subtext">Supports JPG, PNG - Will be cropped to 8:10 ratio</div>
                             </div>
                             <input type="file" id="imageInput-0" multiple accept="image/jpeg,image/jpg,image/png" style="display: none;" onchange="handleImageUpload(event, 0)">
                             
@@ -148,8 +148,8 @@
                     <!-- Custom Text -->
                     <div class="form-section canvas-item" data-canvas="0">
                         <div class="form-group">
-                            <label data-translate="customText">Enter your text</label>
-                            <input type="text" id="customText-0" maxlength="50" placeholder="e.g., Forever Together" data-translate-placeholder="customTextPlaceholder" oninput="updateCharCount(0); updateLivePreview(0)">
+                            <label>Enter your text</label>
+                            <input type="text" id="customText-0" maxlength="50" placeholder="e.g., Forever Together" oninput="updateCharCount(0); updateLivePreview(0)">
                             <div class="char-counter">
                                 <span id="charCount-0">0</span>/50
                             </div>
@@ -167,8 +167,8 @@
                     <!-- Date -->
                     <div class="form-section canvas-item" data-canvas="0" id="dateSection-0">
                         <div class="form-group">
-                            <label data-translate="date">Date</label>
-                            <input type="text" id="date-0" placeholder="e.g., Dec 25, 2024" data-translate-placeholder="datePlaceholder" oninput="updateLivePreview(0)">
+                            <label>Date</label>
+                            <input type="text" id="date-0" placeholder="e.g., Dec 25, 2024" oninput="updateLivePreview(0)">
                         </div>
                     </div>
 
@@ -176,7 +176,7 @@
                     <div class="form-section canvas-item" data-canvas="0" id="welcomeHomeSection-0">
                         <div class="checkbox-wrapper">
                             <input type="checkbox" id="welcomeHome-0">
-                            <label for="welcomeHome-0" data-translate="welcomeHome">Welcome Home</label>
+                            <label for="welcomeHome-0">Welcome Home</label>
                         </div>
                     </div>
 
@@ -195,39 +195,39 @@
                 <!-- Notes Section -->
                 <div class="form-section">
                     <div class="form-group">
-                        <label data-translate="notes">Additional Notes</label>
-                        <textarea id="notes" rows="3" placeholder="Special instructions..." data-translate-placeholder="notesPlaceholder"></textarea>
+                        <label>Additional Notes</label>
+                        <textarea id="notes" rows="3" placeholder="Special instructions..."></textarea>
                     </div>
                 </div>
 
                 <!-- Customer Info -->
                 <div class="form-section">
-                    <h2 data-translate="customerInfo">Customer Information</h2>
+                    <h2>Customer Information</h2>
                     <div class="form-group">
-                        <label data-translate="fbName">Your Facebook name *</label>
-                        <input type="text" id="fbName" placeholder="Enter your Facebook name" required data-translate-placeholder="fbNamePlaceholder">
+                        <label>Your Facebook name *</label>
+                        <input type="text" id="fbName" placeholder="Enter your Facebook name" required>
                         <div class="validation-error" id="fbName-error"></div>
                     </div>
                     <div class="form-group">
-                        <label data-translate="email">Email *</label>
-                        <input type="email" id="email" required placeholder="your@email.com" data-translate-placeholder="emailPlaceholder">
+                        <label>Email *</label>
+                        <input type="email" id="email" required placeholder="your@email.com">
                         <div class="validation-error" id="email-error"></div>
                     </div>
                     <div class="form-group">
-                        <label data-translate="phone">Phone number</label>
-                        <input type="tel" id="phone" placeholder="Enter your phone number (optional)" data-translate-placeholder="phonePlaceholder" style="width: 100%; padding: 12px 15px; font-size: 18px; border: 2px solid #ddd; border-radius: 8px; transition: border-color 0.3s ease;" pattern="^[+0-9\s-]*$" maxlength="20" autocomplete="tel">
+                        <label>Phone number</label>
+                        <input type="tel" id="phone" placeholder="Enter your phone number (optional)" style="width: 100%; padding: 12px 15px; font-size: 18px; border: 2px solid #ddd; border-radius: 8px; transition: border-color 0.3s ease;" pattern="^[+0-9\s-]*$" maxlength="20" autocomplete="tel">
                         <div class="validation-error" id="phone-error"></div>
                     </div>
                 </div>
 
                 <!-- Price Summary - UPDATED -->
                 <div class="price-summary-bottom">
-                    <span data-translate="estimatedTotal">Estimated Total</span>: 
+                    <span>Estimated Total</span>: 
                     <span class="total-price-display" id="totalPrice">$0</span>
                 </div>
 
                 <!-- Submit Button -->
-                <button class="submit-btn" onclick="confirmOrder()" data-translate="submit">Submit Order</button>
+                <button class="submit-btn" onclick="confirmOrder()">Submit Order</button>
             </div>
         </div>
     </div>
@@ -236,15 +236,15 @@
     <div id="errorModal" class="modal">
         <div class="modal-content error-modal-content">
             <div class="modal-header">
-                <h3 data-translate="validationErrors">Validation Errors</h3>
+                <h3>Validation Errors</h3>
                 <span class="close" onclick="closeErrorModal()">&times;</span>
             </div>
             <div class="error-summary">
-                <p data-translate="fixErrors">Please fix the following errors:</p>
+                <p>Please fix the following errors:</p>
                 <ul id="errorList"></ul>
             </div>
             <div class="modal-footer">
-                <button onclick="goToFirstError()" class="primary-btn" data-translate="goToError">Go to First Error</button>
+                <button onclick="goToFirstError()" class="primary-btn">Go to First Error</button>
             </div>
         </div>
     </div>
@@ -253,63 +253,63 @@
     <div id="faqModal" class="modal">
         <div class="modal-content faq-content">
             <div class="modal-header">
-                <h3 data-translate="faqTitle">Frequently Asked Questions</h3>
+                <h3>Frequently Asked Questions</h3>
                 <span class="close" onclick="closeFAQ()">&times;</span>
             </div>
             <div class="faq-body">
                 <!-- Shipping Section -->
                 <div class="faq-item">
                     <div class="faq-question" onclick="toggleFAQ(this)">
-                        <span data-translate="shippingTitle">🚚 <strong>Shipping</strong></span>
+                        <span>🚚 <strong>Shipping</strong></span>
                         <span class="faq-toggle">+</span>
                     </div>
                     <div class="faq-answer">
-                        <p data-translate="deliveryTime"><strong>Delivery Time:</strong></p>
+                        <p><strong>Delivery Time:</strong></p>
                         <ul>
-                            <li data-translate="usDelivery">US: 5–10 business days</li>
-                            <li data-translate="intlDelivery">International: 7–15 business days</li>
+                            <li>US: 5–10 business days</li>
+                            <li>International: 7–15 business days</li>
                         </ul>
-                        <p data-translate="orderTracking"><strong>Order Tracking:</strong> Sent via email automatically after purchase</p>
-                        <p data-translate="securePackaging"><strong>Secure Packaging:</strong> Shock-resistant, moisture-proof, and gift-ready</p>
+                        <p><strong>Order Tracking:</strong> Sent via email automatically after purchase</p>
+                        <p><strong>Secure Packaging:</strong> Shock-resistant, moisture-proof, and gift-ready</p>
                     </div>
                 </div>
 
                 <!-- Payment Section -->
                 <div class="faq-item">
                     <div class="faq-question" onclick="toggleFAQ(this)">
-                        <span data-translate="paymentTitle">💳 <strong>Payment</strong></span>
+                        <span>💳 <strong>Payment</strong></span>
                         <span class="faq-toggle">+</span>
                     </div>
                     <div class="faq-answer">
-                        <p data-translate="acceptedMethods"><strong>Accepted Methods:</strong></p>
+                        <p><strong>Accepted Methods:</strong></p>
                         <ul>
-                            <li data-translate="creditCards">Credit / Debit Cards</li>
-                            <li data-translate="paypal">PayPal</li>
-                            <li data-translate="applePay">Apple Pay</li>
+                            <li>Credit / Debit Cards</li>
+                            <li>PayPal</li>
+                            <li>Apple Pay</li>
                         </ul>
-                        <p data-translate="secureCheckout"><strong>Secure Checkout:</strong> All payments are encrypted and processed safely</p>
-                        <p data-translate="fastEasy"><strong>Fast & Easy:</strong> No account needed — just a few quick steps</p>
+                        <p><strong>Secure Checkout:</strong> All payments are encrypted and processed safely</p>
+                        <p><strong>Fast & Easy:</strong> No account needed — just a few quick steps</p>
                     </div>
                 </div>
 
                 <!-- How It Works Section -->
                 <div class="faq-item">
                     <div class="faq-question" onclick="toggleFAQ(this)">
-                        <span data-translate="howItWorksTitle">🧑‍🎨 <strong>How It Works</strong></span>
+                        <span>🧑‍🎨 <strong>How It Works</strong></span>
                         <span class="faq-toggle">+</span>
                     </div>
                     <div class="faq-answer">
-                        <p data-translate="noLivePreview">This canvas doesn't support live previews — but don't worry!</p>
-                        <p data-translate="designerEnhance">✅ Our designers will enhance your photo to look its very best.</p>
-                        <p data-translate="completeDetails">📝 Once you've completed the canvas details,</p>
-                        <p data-translate="emailPreview">📩 You'll receive a preview via email within 1–2 business days.</p>
-                        <p data-translate="requestEdits">🖼️ You can request edits until you're completely satisfied.</p>
-                        <p data-translate="finalizeOrder">✅ Finalize your order and we'll take care of the rest.</p>
+                        <p>This canvas doesn't support live previews — but don't worry!</p>
+                        <p>✅ Our designers will enhance your photo to look its very best.</p>
+                        <p>📝 Once you've completed the canvas details,</p>
+                        <p>📩 You'll receive a preview via email within 1–2 business days.</p>
+                        <p>🖼️ You can request edits until you're completely satisfied.</p>
+                        <p>✅ Finalize your order and we'll take care of the rest.</p>
                     </div>
                 </div>
             </div>
             <div class="faq-footer">
-                <button onclick="closeFAQ()" class="primary-btn" data-translate="backToForm">Back to Form</button>
+                <button onclick="closeFAQ()" class="primary-btn">Back to Form</button>
             </div>
         </div>
     </div>
@@ -317,7 +317,7 @@
     <!-- Crop Modal -->
     <div id="cropModal" class="modal">
         <div class="modal-content crop-modal-content">
-            <h3 data-translate="cropImage">Crop Your Image</h3>
+            <h3>Crop Your Image</h3>
             <div class="crop-wrapper">
                 <div class="crop-container">
                     <img id="cropImage" style="max-width: 100%;">
@@ -335,8 +335,8 @@
                 </div>
             </div>
             <div class="crop-buttons">
-                <button onclick="cancelCrop()" data-translate="cancel">Cancel</button>
-                <button onclick="applyCrop()" class="primary-btn" data-translate="apply">Apply Crop</button>
+                <button onclick="cancelCrop()">Cancel</button>
+                <button onclick="applyCrop()" class="primary-btn">Apply Crop</button>
             </div>
         </div>
     </div>
@@ -344,11 +344,11 @@
     <!-- Confirmation Modal -->
     <div id="confirmModal" class="modal">
         <div class="modal-content confirm-content">
-            <h3 data-translate="confirmOrder">Review Your Order</h3>
+            <h3>Review Your Order</h3>
             <div id="orderSummary"></div>
             <div class="confirm-buttons">
-                <button onclick="closeConfirmModal()" data-translate="goBack">Go Back</button>
-                <button onclick="submitOrder()" class="primary-btn" data-translate="confirmSubmit">Confirm Order</button>
+                <button onclick="closeConfirmModal()">Go Back</button>
+                <button onclick="submitOrder()" class="primary-btn">Confirm Order</button>
             </div>
         </div>
     </div>
@@ -357,11 +357,11 @@
     <div id="thankYouPage" class="thank-you-page" style="display: none;">
         <div class="thank-you-content">
             <div class="thank-you-icon">✅</div>
-            <h2 data-translate="thankYouTitle">Thank You!</h2>
-            <p data-translate="thankYouMessage">
+            <h2>Thank You!</h2>
+            <p>
                 Your order has been received successfully. We'll send your canvas preview to your email and Messenger within 2-3 business days.
             </p>
-            <button onclick="startNewOrder()" class="primary-btn" data-translate="newOrder">Place Another Order</button>
+            <button onclick="startNewOrder()" class="primary-btn">Place Another Order</button>
         </div>
     </div>
 
@@ -419,7 +419,6 @@
             }
         }
     </script>
-    <script src="translations.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

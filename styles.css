@@ -265,7 +265,7 @@ body {
 /* Sparkle effect */
 .best-seller::before,
 .best-seller::after {
-    content: '✨';
+    content: '';
     position: absolute;
     animation: sparkle 1s ease-in-out infinite;
 }
@@ -980,6 +980,78 @@ body {
 
 .confirm-buttons button:first-child:hover {
     background: #e0e0e0;
+}
+
+/* Enhanced Order Summary Styles - ADDED */
+.order-summary {
+    font-size: 16px;
+    line-height: 1.6;
+}
+
+.order-summary h4 {
+    color: #2C5F41;
+    margin-bottom: 15px;
+    margin-top: 25px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #e9ecef;
+}
+
+.order-summary h4:first-child {
+    margin-top: 0;
+}
+
+.canvas-summary {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 15px;
+    border-left: 4px solid #2C5F41;
+}
+
+.canvas-summary h5 {
+    color: #8B4513;
+    margin-bottom: 12px;
+    font-size: 18px;
+}
+
+.canvas-summary p {
+    margin-bottom: 8px;
+    color: #555;
+}
+
+.canvas-summary p strong {
+    color: #333;
+    min-width: 120px;
+    display: inline-block;
+}
+
+.canvas-price {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px dashed #ddd;
+    color: #2C5F41 !important;
+    font-size: 16px;
+}
+
+.final-total {
+    background: #2C5F41;
+    color: white !important;
+    padding: 15px;
+    border-radius: 8px;
+    text-align: center;
+    margin-top: 20px;
+}
+
+.final-total strong {
+    color: white !important;
+}
+
+/* Responsive adjustments for order summary */
+@media (max-width: 600px) {
+    .canvas-summary p strong {
+        display: block;
+        margin-bottom: 4px;
+    }
 }
 
 /* Primary Button */
