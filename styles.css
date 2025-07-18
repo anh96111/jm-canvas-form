@@ -382,7 +382,7 @@ body {
 
 .preview-text {
     font-family: 'CustomText', Arial, sans-serif;
-    font-size: 32px; /* CHANGED: từ 24px thành 32px */
+    font-size: 52px; /* CHANGED: từ 24px thành 32px */
     color: #000;
     margin-bottom: 4px; /* CHANGED: từ 8px thành 4px */
     text-align: center;
@@ -409,7 +409,7 @@ body {
 }
 
 .live-preview-box.collage-preview .preview-text {
-    font-size: 26px; /* CHANGED: từ 20px thành 26px */
+    font-size: 38px; /* CHANGED: từ 20px thành 26px */
     margin-bottom: 0;
 }
 
