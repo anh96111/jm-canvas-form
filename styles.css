@@ -1006,7 +1006,7 @@ body {
     }
     
     .preview-text {
-        font-size: 28px; /* UPDATED: responsive font size */
+        font-size: 38px; /* UPDATED: responsive font size */
     }
     
     .preview-date {
@@ -1014,7 +1014,7 @@ body {
     }
     
     .live-preview-box.collage-preview .preview-text {
-        font-size: 24px; /* UPDATED: responsive font size cho collage */
+        font-size: 34px; /* UPDATED: responsive font size cho collage */
     }
 }
 

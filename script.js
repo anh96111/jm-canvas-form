@@ -4,7 +4,7 @@ let uploadedImages = {};
 let canvasFormData = {};
 let cropper = null;
 let currentCropIndex = null;
-let currentCanvasIndex = null;
+let currentCanvasIndex = 0; // FIXED: Initialize to 0 instead of null
 let pendingFiles = [];
 let currentRotation = 0;
 
@@ -103,13 +103,16 @@ function createLivePreviewBox(canvasIndex) {
     `;
 }
 
-// Canvas type change handler
+// Canvas type change handler - UPDATED
 function handleCanvasTypeChange() {
     const canvasType = document.getElementById('canvasType').value;
     const multiCanvasSection = document.getElementById('multiCanvasSection');
     const canvasQuantitySelect = document.getElementById('canvasQuantity');
     const canvasTabs = document.getElementById('canvasTabs');
     const miniCanvasNav = document.getElementById('miniCanvasNav');
+    
+    // FIXED: Store current canvas data before changing
+    storeCanvasData(currentCanvasIndex);
     
     // Update collage price display
     updateCollagePriceDisplay();
@@ -152,11 +155,17 @@ function handleCanvasTypeChange() {
         
         canvasTabs.style.display = 'flex';
         miniCanvasNav.style.display = 'block';
+        
+        // FIXED: Reset currentCanvasIndex before updateCanvasCount
+        currentCanvasIndex = 0;
+        
         updateCanvasCount();
     } else {
         multiCanvasSection.style.display = 'none';
         canvasTabs.style.display = 'none';
         miniCanvasNav.style.display = 'none';
+        // FIXED: Reset currentCanvasIndex for single canvas
+        currentCanvasIndex = 0;
         resetToSingleCanvas();
     }
     
@@ -219,7 +228,7 @@ function resetToSingleCanvas() {
     calculateTotalPrice();
 }
 
-// Update canvas count
+// Update canvas count - UPDATED
 function updateCanvasCount() {
     const quantity = parseInt(document.getElementById('canvasQuantity').value);
     const canvasType = document.getElementById('canvasType').value;
@@ -231,6 +240,11 @@ function updateCanvasCount() {
     // Clear existing tabs
     canvasTabs.innerHTML = '';
     miniTabs.innerHTML = '';
+    
+    // FIXED: Hide all existing canvas items first
+    container.querySelectorAll('.canvas-item').forEach(item => {
+        item.style.display = 'none';
+    });
     
     // Special handling for collage with 1 canvas
     if (canvasType === 'collage' && quantity === 1) {
@@ -268,7 +282,7 @@ function updateCanvasCount() {
         if (!canvasFormData[i]) canvasFormData[i] = {};
         
         // Create canvas items if they don't exist
-        if (!container.querySelector(`[data-canvas="${i}"]`)) {
+        if (i > 0 && !container.querySelector(`[data-canvas="${i}"]`)) {
             createCanvasItems(i);
         }
     }
@@ -287,8 +301,16 @@ function updateCanvasCount() {
     // Update totals
     document.getElementById('totalCanvasNum').textContent = quantity;
     
-    // Show first canvas
-    switchCanvas(0);
+    // FIXED: Ensure currentCanvasIndex is valid
+    if (currentCanvasIndex >= quantity) {
+        currentCanvasIndex = 0;
+    }
+    
+    // FIXED: Show first canvas with proper data restore using setTimeout
+    setTimeout(() => {
+        switchCanvas(currentCanvasIndex);
+    }, 0);
+    
     calculateTotalPrice();
     
     // Update collage fields after creating canvas
