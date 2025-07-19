@@ -135,7 +135,7 @@ function updateCanvas0Preview() {
     }
 }
 
-// Canvas type change handler - UPDATED
+// Canvas type change handler - UPDATED với recreate canvas 0
 function handleCanvasTypeChange() {
     const canvasType = document.getElementById('canvasType').value;
     const multiCanvasSection = document.getElementById('multiCanvasSection');
@@ -143,7 +143,7 @@ function handleCanvasTypeChange() {
     const canvasTabs = document.getElementById('canvasTabs');
     const miniCanvasNav = document.getElementById('miniCanvasNav');
     
-    // FIXED: Store current canvas data before changing
+    // Store current canvas data
     storeCanvasData(currentCanvasIndex);
     
     // Update collage price display
@@ -153,7 +153,6 @@ function handleCanvasTypeChange() {
         multiCanvasSection.style.display = 'block';
         
         // Clear and rebuild options
-        const currentValue = canvasQuantitySelect.value;
         canvasQuantitySelect.innerHTML = '';
         
         if (canvasType === 'collage') {
@@ -167,7 +166,6 @@ function handleCanvasTypeChange() {
             
             const label = multiCanvasSection.querySelector('label');
             label.textContent = 'How many canvas for collage?';
-            label.setAttribute('data-translate', 'collageQuantity');
         } else {
             // For multi: 2-10 canvas
             for (let i = 2; i <= 10; i++) {
@@ -179,7 +177,6 @@ function handleCanvasTypeChange() {
             
             const label = multiCanvasSection.querySelector('label');
             label.textContent = 'How many different canvas?';
-            label.setAttribute('data-translate', 'selectQuantity');
         }
         
         // Set default value
@@ -188,7 +185,7 @@ function handleCanvasTypeChange() {
         canvasTabs.style.display = 'flex';
         miniCanvasNav.style.display = 'block';
         
-        // FIXED: Reset currentCanvasIndex before updateCanvasCount
+        // Reset currentCanvasIndex
         currentCanvasIndex = 0;
         
         updateCanvasCount();
@@ -196,21 +193,12 @@ function handleCanvasTypeChange() {
         multiCanvasSection.style.display = 'none';
         canvasTabs.style.display = 'none';
         miniCanvasNav.style.display = 'none';
-        // FIXED: Reset currentCanvasIndex for single canvas
         currentCanvasIndex = 0;
         resetToSingleCanvas();
     }
     
     // Update field visibility for collage
     updateCollageFields();
-    
-    // THÊM: Update live preview for canvas 0
-    updateCanvas0Preview();
-    
-    // FIXED: Force update current canvas view
-    if (currentCanvasIndex !== null && currentCanvasIndex !== undefined) {
-        switchCanvas(currentCanvasIndex);
-    }
 }
 
 // Update fields for collage
@@ -242,45 +230,40 @@ function updateCollagePriceDisplay() {
     });
 }
 
-// Reset to single canvas
+// Reset to single canvas - UPDATED để recreate canvas 0
 function resetToSingleCanvas() {
-    // Clear all data except first canvas
+    const container = document.getElementById('canvasItemsContainer');
+    
+    // Store canvas 0 data before clearing
+    storeCanvasData(0);
+    
+    // Clear ALL canvas items
+    container.innerHTML = '';
+    
+    // Keep only canvas 0 data
     selectedSizes = { 0: selectedSizes[0] };
     uploadedImages = { 0: uploadedImages[0] || [] };
     canvasFormData = { 0: canvasFormData[0] || {} };
     
-    // Reset UI
-    const container = document.getElementById('canvasItemsContainer');
-    const firstCanvasItems = container.querySelectorAll('[data-canvas="0"]');
+    // Recreate canvas 0
+    createCanvasItems(0);
     
-    // Remove all canvas items except first
-    container.querySelectorAll('.canvas-item').forEach(item => {
-        if (item.getAttribute('data-canvas') !== '0') {
-            item.remove();
-        }
-    });
+    // Console log verification
+    console.log('=== Single Canvas Reset ===');
+    const canvas0Items = document.querySelectorAll('[data-canvas="0"]');
+    console.log(`Canvas 0 items: ${canvas0Items.length}`);
+    console.log('=== End Reset ===');
     
-    // Show first canvas items
-    firstCanvasItems.forEach(item => {
-        item.style.display = 'block';
-    });
-    
-    // THÊM: Reset preview cho canvas 0
-    const livePreviewBox = document.getElementById('livePreview-0');
-    const datePreview = document.getElementById('previewDate-0');
-    
-    if (livePreviewBox) {
-        livePreviewBox.style.height = '90px';
-        livePreviewBox.classList.remove('collage-preview');
-        if (datePreview) {
-            datePreview.style.display = 'block';
-        }
-    }
+    // Show canvas 0 and restore data
+    setTimeout(() => {
+        switchCanvas(0);
+        restoreCanvasData(0);
+    }, 0);
     
     calculateTotalPrice();
 }
 
-// Update canvas count - UPDATED
+// Update canvas count - UPDATED để recreate tất cả canvas kể cả canvas 0
 function updateCanvasCount() {
     const quantity = parseInt(document.getElementById('canvasQuantity').value);
     const canvasType = document.getElementById('canvasType').value;
@@ -289,14 +272,15 @@ function updateCanvasCount() {
     const miniCanvasNav = document.getElementById('miniCanvasNav');
     const container = document.getElementById('canvasItemsContainer');
     
+    // Store current data của canvas 0 trước khi xóa
+    storeCanvasData(0);
+    
     // Clear existing tabs
     canvasTabs.innerHTML = '';
     miniTabs.innerHTML = '';
     
-    // FIXED: Hide all existing canvas items first
-    container.querySelectorAll('.canvas-item').forEach(item => {
-        item.style.display = 'none';
-    });
+    // QUAN TRỌNG: Xóa TẤT CẢ canvas items kể cả canvas 0
+    container.innerHTML = '';
     
     // Special handling for collage with 1 canvas
     if (canvasType === 'collage' && quantity === 1) {
@@ -310,7 +294,7 @@ function updateCanvasCount() {
     // Update discount notification
     updateDiscountNotification(quantity);
     
-    // Generate tabs and canvas items
+    // Generate tabs and recreate ALL canvas items
     for (let i = 0; i < quantity; i++) {
         // Only create tabs if more than 1 canvas or not collage
         if (!(canvasType === 'collage' && quantity === 1)) {
@@ -329,51 +313,91 @@ function updateCanvasCount() {
             miniTabs.appendChild(miniTab);
         }
         
-        // Initialize data structures
+        // Initialize data structures if not exist
         if (!uploadedImages[i]) uploadedImages[i] = [];
         if (!canvasFormData[i]) canvasFormData[i] = {};
         
-        // Create canvas items if they don't exist
-        if (i > 0 && !container.querySelector(`[data-canvas="${i}"]`)) {
-            createCanvasItems(i);
-        }
+        // Create canvas items - INCLUDING canvas 0
+        createCanvasItems(i);
     }
     
-    // Remove excess canvas items
-    container.querySelectorAll('.canvas-item').forEach(item => {
-        const canvasIndex = parseInt(item.getAttribute('data-canvas'));
-        if (canvasIndex >= quantity) {
-            item.remove();
-            delete selectedSizes[canvasIndex];
-            delete uploadedImages[canvasIndex];
-            delete canvasFormData[canvasIndex];
+    // Clean up excess data
+    Object.keys(uploadedImages).forEach(key => {
+        if (parseInt(key) >= quantity) {
+            delete uploadedImages[key];
+            delete canvasFormData[key];
+            delete selectedSizes[key];
         }
     });
     
     // Update totals
     document.getElementById('totalCanvasNum').textContent = quantity;
     
-    // FIXED: Ensure currentCanvasIndex is valid
+    // Ensure currentCanvasIndex is valid
     if (currentCanvasIndex >= quantity) {
         currentCanvasIndex = 0;
     }
     
-    // FIXED: Show first canvas directly without setTimeout
-    switchCanvas(currentCanvasIndex);
+    // Console log để verify
+    console.log('=== Canvas Creation Verification ===');
+    console.log(`Total canvas requested: ${quantity}`);
+    console.log(`Canvas type: ${canvasType}`);
+    
+    for (let i = 0; i < quantity; i++) {
+        const canvasItems = document.querySelectorAll(`[data-canvas="${i}"]`);
+        console.log(`Canvas ${i}: ${canvasItems.length} items found`);
+        
+        // Verify specific elements
+        const elements = {
+            size: document.querySelector(`[data-canvas="${i}"] .size-grid`),
+            upload: document.getElementById(`imageInput-${i}`),
+            customText: document.getElementById(`customText-${i}`),
+            livePreview: document.getElementById(`livePreview-${i}`),
+            date: document.getElementById(`date-${i}`),
+            welcomeHome: document.getElementById(`welcomeHome-${i}`),
+            twoPersonCanvas: document.getElementById(`twoPersonCanvas-${i}`)
+        };
+        
+        console.log(`Canvas ${i} elements:`, {
+            size: !!elements.size,
+            upload: !!elements.upload,
+            customText: !!elements.customText,
+            livePreview: !!elements.livePreview,
+            date: !!elements.date,
+            welcomeHome: !!elements.welcomeHome,
+            twoPersonCanvas: !!elements.twoPersonCanvas
+        });
+    }
+    console.log('=== End Verification ===');
+    
+    // Show current canvas after creation
+    setTimeout(() => {
+        switchCanvas(currentCanvasIndex);
+        // Restore data for all canvas after recreation
+        for (let i = 0; i < quantity; i++) {
+            restoreCanvasData(i);
+        }
+    }, 0);
     
     calculateTotalPrice();
-    
-    // Update collage fields after creating canvas
     updateCollageFields();
 }
 
-// Create canvas items for a specific index
+// Create canvas items for a specific index - UPDATED để cho phép tạo canvas 0
 function createCanvasItems(canvasIndex) {
-    if (canvasIndex === 0) return; // Don't recreate first canvas
+    // Remove the check that prevents canvas 0 creation
+    // if (canvasIndex === 0) return;
     
     const container = document.getElementById('canvasItemsContainer');
     const canvasType = document.getElementById('canvasType').value;
     const isCollage = canvasType === 'collage';
+    
+    // Double check không tạo duplicate
+    const existingItems = document.querySelectorAll(`[data-canvas="${canvasIndex}"]`);
+    if (existingItems.length > 0) {
+        console.warn(`Canvas items for index ${canvasIndex} already exist - removing old ones`);
+        existingItems.forEach(item => item.remove());
+    }
     
     let html = generateCanvasHTML(canvasIndex, isCollage);
     
@@ -398,14 +422,14 @@ function createCanvasItems(canvasIndex) {
     }
 }
 
-// Generate HTML for canvas items
+// Generate HTML for canvas items - UPDATED với ID chính xác
 function generateCanvasHTML(canvasIndex, isCollage = false) {
     let html = '';
     
-    // Size Selection
+    // Size Selection - với data-canvas chính xác
     html += `
         <div class="form-section canvas-item" data-canvas="${canvasIndex}" style="display: none;">
-            <h2 data-translate="selectSize">Select Size *</h2>
+            <h2>Select Size *</h2>
             <div class="size-grid">
                 <div class="size-option" data-size="8x10" onclick="selectSize('8x10', ${canvasIndex})">
                     <div class="size-display">8x10 inches</div>
@@ -413,7 +437,7 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
                 </div>
                 <div class="size-option" data-size="11x14" onclick="selectSize('11x14', ${canvasIndex})">
                     <div class="size-display">11x14 inches</div>
-                    <div class="best-seller" data-translate="bestSeller">Best Seller</div>
+                    <div class="best-seller">Best Seller</div>
                     <div class="collage-price" style="display: ${isCollage ? 'block' : 'none'};">+$5 for collage</div>
                 </div>
                 <div class="size-option" data-size="16x20" onclick="selectSize('16x20', ${canvasIndex})">
@@ -430,27 +454,27 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
         </div>
     `;
     
-    // Two Person Canvas (not for collage)
+    // Two Person Canvas (not for collage) - với ID unique
     if (!isCollage) {
         html += `
             <div class="form-section canvas-item" data-canvas="${canvasIndex}" id="twoPersonSection-${canvasIndex}" style="display: none;">
                 <div class="checkbox-wrapper">
                     <input type="checkbox" id="twoPersonCanvas-${canvasIndex}" onchange="handleTwoPersonChange(${canvasIndex})">
-                    <label for="twoPersonCanvas-${canvasIndex}" data-translate="twoPersonLabel">2 people on 1 canvas (+$10)</label>
+                    <label for="twoPersonCanvas-${canvasIndex}">2 people on 1 canvas (+$10)</label>
                 </div>
             </div>
         `;
     }
     
-    // Image Upload
+    // Image Upload - với ID unique
     html += `
         <div class="form-section canvas-item" data-canvas="${canvasIndex}" style="display: none;">
-            <h2 data-translate="uploadImages">Upload Images *</h2>
+            <h2>Upload Images *</h2>
             <div class="upload-container">
                 <div class="upload-area" onclick="triggerFileInput(${canvasIndex})">
                     <div class="upload-icon">📷</div>
-                    <div class="upload-text" data-translate="uploadText">Click to upload images (Max 6)</div>
-                    <div class="upload-subtext" data-translate="uploadSubtext">Supports JPG, PNG - Will be cropped to 8:10 ratio</div>
+                    <div class="upload-text">Click to upload images (Max 6)</div>
+                    <div class="upload-subtext">Supports JPG, PNG - Will be cropped to 8:10 ratio</div>
                 </div>
                 <input type="file" id="imageInput-${canvasIndex}" multiple accept="image/jpeg,image/jpg,image/png" style="display: none;" onchange="handleImageUpload(event, ${canvasIndex})">
                 <div class="image-thumbnails" id="imageThumbnails-${canvasIndex}"></div>
@@ -459,14 +483,13 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
         </div>
     `;
     
-    // Custom Text
+    // Custom Text - với ID unique
     html += `
         <div class="form-section canvas-item" data-canvas="${canvasIndex}" style="display: none;">
             <div class="form-group">
-                <label data-translate="customText">Enter your text</label>
+                <label>Enter your text</label>
                 <input type="text" id="customText-${canvasIndex}" maxlength="50" 
                        placeholder="e.g., Forever Together" 
-                       data-translate-placeholder="customTextPlaceholder"
                        oninput="updateCharCount(${canvasIndex}); updateLivePreview(${canvasIndex})">
                 <div class="char-counter">
                     <span id="charCount-${canvasIndex}">0</span>/50
@@ -475,31 +498,30 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
         </div>
     `;
     
-    // Live Preview Box
+    // Live Preview Box - với ID unique
     html += createLivePreviewBox(canvasIndex);
     
-    // Date (not for collage)
+    // Date (not for collage) - với ID unique
     if (!isCollage) {
         html += `
             <div class="form-section canvas-item" data-canvas="${canvasIndex}" id="dateSection-${canvasIndex}" style="display: none;">
                 <div class="form-group">
-                    <label data-translate="date">Date</label>
+                    <label>Date</label>
                     <input type="text" id="date-${canvasIndex}" 
                            placeholder="e.g., Dec 25, 2024" 
-                           data-translate-placeholder="datePlaceholder"
                            oninput="updateLivePreview(${canvasIndex})">
                 </div>
             </div>
         `;
     }
     
-    // Welcome Home (not for collage)
+    // Welcome Home (not for collage) - với ID unique
     if (!isCollage) {
         html += `
             <div class="form-section canvas-item" data-canvas="${canvasIndex}" id="welcomeHomeSection-${canvasIndex}" style="display: none;">
                 <div class="checkbox-wrapper">
                     <input type="checkbox" id="welcomeHome-${canvasIndex}">
-                    <label for="welcomeHome-${canvasIndex}" data-translate="welcomeHome">Welcome Home</label>
+                    <label for="welcomeHome-${canvasIndex}">Welcome Home</label>
                 </div>
             </div>
         `;
@@ -510,6 +532,14 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
 
 // Switch between canvases - UPDATED
 function switchCanvas(index) {
+    // Validate index
+    if (index === null || index === undefined || index < 0) return;
+    
+    // Store current canvas data
+    if (currentCanvasIndex !== null && currentCanvasIndex !== undefined) {
+        storeCanvasData(currentCanvasIndex);
+    }
+    
     // Update active tab
     document.querySelectorAll('.tab').forEach((tab, i) => {
         tab.classList.toggle('active', i === index);
@@ -519,20 +549,25 @@ function switchCanvas(index) {
         tab.classList.toggle('active', i === index);
     });
     
-    // Hide all canvas items
+    // QUAN TRỌNG: Ẩn TẤT CẢ canvas items trước
     document.querySelectorAll('.canvas-item').forEach(item => {
         item.style.display = 'none';
     });
     
-    // Show selected canvas items
-    document.querySelectorAll(`[data-canvas="${index}"]`).forEach(item => {
+    // Chỉ hiển thị canvas items của index được chọn
+    const itemsToShow = document.querySelectorAll(`[data-canvas="${index}"]`);
+    if (itemsToShow.length === 0) {
+        console.error(`No canvas items found for index ${index}`);
+        return;
+    }
+    
+    itemsToShow.forEach(item => {
         item.style.display = 'block';
     });
     
-    // FIXED: Hide collage-specific fields after showing canvas items
+    // Handle collage-specific fields
     const canvasType = document.getElementById('canvasType').value;
     if (canvasType === 'collage') {
-        // Hide fields that shouldn't show for collage
         const dateSection = document.getElementById(`dateSection-${index}`);
         const welcomeSection = document.getElementById(`welcomeHomeSection-${index}`);
         const twoPersonSection = document.getElementById(`twoPersonSection-${index}`);
@@ -541,7 +576,6 @@ function switchCanvas(index) {
         if (welcomeSection) welcomeSection.style.display = 'none';
         if (twoPersonSection) twoPersonSection.style.display = 'none';
         
-        // THÊM: Update preview box cho canvas hiện tại
         const livePreviewBox = document.getElementById(`livePreview-${index}`);
         const datePreview = document.getElementById(`previewDate-${index}`);
         
@@ -555,10 +589,11 @@ function switchCanvas(index) {
     }
     
     // Update current canvas number
-    document.getElementById('currentCanvasNum').textContent = index + 1;
+    if (document.getElementById('currentCanvasNum')) {
+        document.getElementById('currentCanvasNum').textContent = index + 1;
+    }
     
-    // Store form data for current canvas
-    storeCanvasData(currentCanvasIndex);
+    // Update current index
     currentCanvasIndex = index;
     
     // Restore form data for new canvas
@@ -1083,10 +1118,16 @@ function showError(elementId, message) {
     }
 }
 
-// Confirm order
+// Confirm order - UPDATED
 function confirmOrder() {
-    // Store current canvas data
-    storeCanvasData(currentCanvasIndex);
+    // Store ALL canvas data before validation
+    const canvasType = document.getElementById('canvasType').value;
+    const canvasCount = canvasType === 'single' ? 1 : parseInt(document.getElementById('canvasQuantity').value || 1);
+    
+    // Store data for all canvases
+    for (let i = 0; i < canvasCount; i++) {
+        storeCanvasData(i);
+    }
     
     if (!validateForm()) {
         return;
@@ -1100,7 +1141,7 @@ function confirmOrder() {
     document.getElementById('confirmModal').style.display = 'block';
 }
 
-// Generate order summary - UPDATED
+// Generate order summary - COMPLETELY UPDATED
 function generateOrderSummary() {
     const canvasType = document.getElementById('canvasType').value;
     const canvasCount = canvasType === 'single' ? 1 : parseInt(document.getElementById('canvasQuantity').value);
@@ -1109,43 +1150,102 @@ function generateOrderSummary() {
     
     // Canvas details
     summary += '<h4>Canvas Details:</h4>';
-    summary += `<p>Type: ${canvasType.charAt(0).toUpperCase() + canvasType.slice(1)}</p>`;
-    summary += `<p>Quantity: ${canvasCount}</p>`;
+    summary += `<p><strong>Type:</strong> ${canvasType.charAt(0).toUpperCase() + canvasType.slice(1)}</p>`;
+    summary += `<p><strong>Quantity:</strong> ${canvasCount}</p>`;
+    
+    // Calculate total before discount
+    let subtotal = 0;
     
     // Individual canvas info
     for (let i = 0; i < canvasCount; i++) {
         summary += `<div class="canvas-summary">`;
         summary += `<h5>Canvas ${i + 1}:</h5>`;
-        summary += `<p>Size: ${selectedSizes[i]}</p>`;
         
-        const isTwoPerson = document.getElementById(`twoPersonCanvas-${i}`)?.checked;
-        if (isTwoPerson) {
-            summary += `<p>2 People Canvas: Yes (+$10)</p>`;
+        // Size and base price
+        const size = selectedSizes[i];
+        let canvasPrice = prices[size];
+        summary += `<p><strong>Size:</strong> ${size} - $${canvasPrice}</p>`;
+        
+        // Canvas-specific options
+        if (canvasType === 'collage') {
+            canvasPrice += 5;
+            summary += `<p><strong>Collage Layout:</strong> Yes (+$5)</p>`;
+        } else {
+            // Two Person Canvas (not for collage)
+            const isTwoPerson = document.getElementById(`twoPersonCanvas-${i}`)?.checked;
+            if (isTwoPerson) {
+                canvasPrice += 10;
+                summary += `<p><strong>2 People Canvas:</strong> Yes (+$10)</p>`;
+            }
+            
+            // Date (not for collage)
+            const date = document.getElementById(`date-${i}`)?.value;
+            if (date) {
+                summary += `<p><strong>Date:</strong> ${date}</p>`;
+            }
+            
+            // Welcome Home (not for collage)
+            const welcomeHome = document.getElementById(`welcomeHome-${i}`)?.checked;
+            if (welcomeHome) {
+                summary += `<p><strong>Welcome Home:</strong> Yes</p>`;
+            }
         }
         
-        summary += `<p>Images: ${uploadedImages[i]?.length || 0} uploaded</p>`;
+        // Images
+        const imageCount = uploadedImages[i]?.length || 0;
+        summary += `<p><strong>Images:</strong> ${imageCount} uploaded</p>`;
         
+        // Custom Text
         const customText = document.getElementById(`customText-${i}`)?.value;
         if (customText) {
-            summary += `<p>Text: ${customText}</p>`;
+            summary += `<p><strong>Custom Text:</strong> "${customText}"</p>`;
         }
+        
+        // Canvas subtotal
+        summary += `<p class="canvas-price"><strong>Canvas Price:</strong> $${canvasPrice}</p>`;
+        subtotal += canvasPrice;
         
         summary += `</div>`;
     }
     
+    // Notes section
+    const notes = document.getElementById('notes').value;
+    if (notes) {
+        summary += '<h4>Additional Notes:</h4>';
+        summary += `<p>${notes}</p>`;
+    }
+    
     // Customer info
     summary += '<h4>Customer Information:</h4>';
-    summary += `<p>Facebook Name: ${document.getElementById('fbName').value}</p>`;
-    summary += `<p>Email: ${document.getElementById('email').value}</p>`;
+    summary += `<p><strong>Facebook Name:</strong> ${document.getElementById('fbName').value}</p>`;
+    summary += `<p><strong>Email:</strong> ${document.getElementById('email').value}</p>`;
     
     const phone = document.getElementById('phone').value;
     if (phone) {
-        summary += `<p>Phone: ${phone}</p>`;
+        summary += `<p><strong>Phone:</strong> ${phone}</p>`;
     }
     
-    // Total price - Use innerHTML to preserve formatting
-    const totalPriceElement = document.getElementById('totalPrice');
-    summary += `<h4>Total Price: ${totalPriceElement.innerHTML}</h4>`;
+    // Price breakdown
+    summary += '<h4>Price Breakdown:</h4>';
+    summary += `<p><strong>Subtotal:</strong> $${subtotal}</p>`;
+    
+    // Calculate discount
+    let discountPercent = 0;
+    let discountAmount = 0;
+    if (canvasCount >= 5) {
+        discountPercent = 12;
+        discountAmount = Math.round(subtotal * 0.12);
+    } else if (canvasCount >= 3) {
+        discountPercent = 5;
+        discountAmount = Math.round(subtotal * 0.05);
+    }
+    
+    if (discountPercent > 0) {
+        summary += `<p><strong>Discount (${discountPercent}%):</strong> -$${discountAmount}</p>`;
+    }
+    
+    const finalTotal = subtotal - discountAmount;
+    summary += `<h4 class="final-total"><strong>Total Price:</strong> $${finalTotal}</h4>`;
     
     summary += '</div>';
     
