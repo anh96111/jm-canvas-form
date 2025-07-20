@@ -232,6 +232,11 @@
         </div>
     </div>
 
+    <!-- NEW: Hidden Upload Spinner Template -->
+    <div id="uploadSpinner" style="display: none;">
+        <div class="loading"></div>
+    </div>
+
     <!-- Error Summary Modal -->
     <div id="errorModal" class="modal">
         <div class="modal-content error-modal-content">
@@ -314,7 +319,7 @@
         </div>
     </div>
 
-    <!-- Crop Modal -->
+    <!-- UPDATED: Crop Modal with Upload Progress -->
     <div id="cropModal" class="modal">
         <div class="modal-content crop-modal-content">
             <h3>Crop Your Image</h3>
@@ -335,8 +340,14 @@
                 </div>
             </div>
             <div class="crop-buttons">
-                <button onclick="cancelCrop()">Cancel</button>
-                <button onclick="applyCrop()" class="primary-btn">Apply Crop</button>
+                <button onclick="cancelCrop()" id="cropCancelBtn">Cancel</button>
+                <button onclick="applyCrop()" class="primary-btn" id="cropApplyBtn">
+                    <span id="cropBtnText">Apply Crop</span>
+                    <span id="cropBtnLoading" class="crop-uploading" style="display: none;">
+                        <span>Uploading...</span>
+                        <div class="loading"></div>
+                    </span>
+                </button>
             </div>
         </div>
     </div>
@@ -348,7 +359,7 @@
             <div id="orderSummary"></div>
             <div class="confirm-buttons">
                 <button onclick="closeConfirmModal()">Go Back</button>
-                <button onclick="submitOrder()" class="primary-btn">Confirm Order</button>
+                <button onclick="submitOrder()" class="primary-btn" id="confirmOrderBtn">Confirm Order</button>
             </div>
         </div>
     </div>

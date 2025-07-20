@@ -4,9 +4,12 @@ let uploadedImages = {};
 let canvasFormData = {};
 let cropper = null;
 let currentCropIndex = null;
-let currentCanvasIndex = 0; // FIXED: Initialize to 0 instead of null
+let currentCanvasIndex = 0;
 let pendingFiles = [];
 let currentRotation = 0;
+
+// API Configuration
+const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbygWj_cmQvy29D_K31Kci2g0iBIycf9he2SiRFuU3PsBznjofyZjjQZ-kmDAgRUOzAQ/exec';
 
 // Price configuration
 const prices = {
@@ -16,7 +19,7 @@ const prices = {
     '20x30': 82
 };
 
-// Original price configuration - ADDED
+// Original price configuration
 const originalPrices = {
     '8x10': 54,
     '11x14': 69,
@@ -111,7 +114,7 @@ function createLivePreviewBox(canvasIndex) {
     `;
 }
 
-// THÊM function mới để update preview cho canvas 0
+// Update preview for canvas 0
 function updateCanvas0Preview() {
     const canvasType = document.getElementById('canvasType').value;
     const isCollage = canvasType === 'collage';
@@ -135,7 +138,7 @@ function updateCanvas0Preview() {
     }
 }
 
-// Canvas type change handler - UPDATED với recreate canvas 0
+// Canvas type change handler
 function handleCanvasTypeChange() {
     const canvasType = document.getElementById('canvasType').value;
     const multiCanvasSection = document.getElementById('multiCanvasSection');
@@ -206,7 +209,7 @@ function updateCollageFields() {
     const canvasType = document.getElementById('canvasType').value;
     const isCollage = canvasType === 'collage';
     
-    // Hide/show fields based on canvas type - INCLUDING canvas 0
+    // Hide/show fields based on canvas type
     document.querySelectorAll('[id^="dateSection-"]').forEach(section => {
         section.style.display = isCollage ? 'none' : 'block';
     });
@@ -230,7 +233,7 @@ function updateCollagePriceDisplay() {
     });
 }
 
-// Reset to single canvas - UPDATED để recreate canvas 0
+// Reset to single canvas
 function resetToSingleCanvas() {
     const container = document.getElementById('canvasItemsContainer');
     
@@ -248,12 +251,6 @@ function resetToSingleCanvas() {
     // Recreate canvas 0
     createCanvasItems(0);
     
-    // Console log verification
-    console.log('=== Single Canvas Reset ===');
-    const canvas0Items = document.querySelectorAll('[data-canvas="0"]');
-    console.log(`Canvas 0 items: ${canvas0Items.length}`);
-    console.log('=== End Reset ===');
-    
     // Show canvas 0 and restore data
     setTimeout(() => {
         switchCanvas(0);
@@ -263,7 +260,7 @@ function resetToSingleCanvas() {
     calculateTotalPrice();
 }
 
-// Update canvas count - UPDATED để recreate tất cả canvas kể cả canvas 0
+// Update canvas count
 function updateCanvasCount() {
     const quantity = parseInt(document.getElementById('canvasQuantity').value);
     const canvasType = document.getElementById('canvasType').value;
@@ -272,14 +269,14 @@ function updateCanvasCount() {
     const miniCanvasNav = document.getElementById('miniCanvasNav');
     const container = document.getElementById('canvasItemsContainer');
     
-    // Store current data của canvas 0 trước khi xóa
+    // Store current data
     storeCanvasData(0);
     
     // Clear existing tabs
     canvasTabs.innerHTML = '';
     miniTabs.innerHTML = '';
     
-    // QUAN TRỌNG: Xóa TẤT CẢ canvas items kể cả canvas 0
+    // Clear ALL canvas items
     container.innerHTML = '';
     
     // Special handling for collage with 1 canvas
@@ -317,7 +314,7 @@ function updateCanvasCount() {
         if (!uploadedImages[i]) uploadedImages[i] = [];
         if (!canvasFormData[i]) canvasFormData[i] = {};
         
-        // Create canvas items - INCLUDING canvas 0
+        // Create canvas items
         createCanvasItems(i);
     }
     
@@ -338,38 +335,6 @@ function updateCanvasCount() {
         currentCanvasIndex = 0;
     }
     
-    // Console log để verify
-    console.log('=== Canvas Creation Verification ===');
-    console.log(`Total canvas requested: ${quantity}`);
-    console.log(`Canvas type: ${canvasType}`);
-    
-    for (let i = 0; i < quantity; i++) {
-        const canvasItems = document.querySelectorAll(`[data-canvas="${i}"]`);
-        console.log(`Canvas ${i}: ${canvasItems.length} items found`);
-        
-        // Verify specific elements
-        const elements = {
-            size: document.querySelector(`[data-canvas="${i}"] .size-grid`),
-            upload: document.getElementById(`imageInput-${i}`),
-            customText: document.getElementById(`customText-${i}`),
-            livePreview: document.getElementById(`livePreview-${i}`),
-            date: document.getElementById(`date-${i}`),
-            welcomeHome: document.getElementById(`welcomeHome-${i}`),
-            twoPersonCanvas: document.getElementById(`twoPersonCanvas-${i}`)
-        };
-        
-        console.log(`Canvas ${i} elements:`, {
-            size: !!elements.size,
-            upload: !!elements.upload,
-            customText: !!elements.customText,
-            livePreview: !!elements.livePreview,
-            date: !!elements.date,
-            welcomeHome: !!elements.welcomeHome,
-            twoPersonCanvas: !!elements.twoPersonCanvas
-        });
-    }
-    console.log('=== End Verification ===');
-    
     // Show current canvas after creation
     setTimeout(() => {
         switchCanvas(currentCanvasIndex);
@@ -383,11 +348,8 @@ function updateCanvasCount() {
     updateCollageFields();
 }
 
-// Create canvas items for a specific index - UPDATED để cho phép tạo canvas 0
+// Create canvas items for a specific index
 function createCanvasItems(canvasIndex) {
-    // Remove the check that prevents canvas 0 creation
-    // if (canvasIndex === 0) return;
-    
     const container = document.getElementById('canvasItemsContainer');
     const canvasType = document.getElementById('canvasType').value;
     const isCollage = canvasType === 'collage';
@@ -422,11 +384,11 @@ function createCanvasItems(canvasIndex) {
     }
 }
 
-// Generate HTML for canvas items - UPDATED với ID chính xác
+// Generate HTML for canvas items
 function generateCanvasHTML(canvasIndex, isCollage = false) {
     let html = '';
     
-    // Size Selection - với data-canvas chính xác
+    // Size Selection
     html += `
         <div class="form-section canvas-item" data-canvas="${canvasIndex}" style="display: none;">
             <h2>Select Size *</h2>
@@ -454,7 +416,7 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
         </div>
     `;
     
-    // Two Person Canvas (not for collage) - với ID unique
+    // Two Person Canvas (not for collage)
     if (!isCollage) {
         html += `
             <div class="form-section canvas-item" data-canvas="${canvasIndex}" id="twoPersonSection-${canvasIndex}" style="display: none;">
@@ -466,7 +428,7 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
         `;
     }
     
-    // Image Upload - với ID unique
+    // Image Upload
     html += `
         <div class="form-section canvas-item" data-canvas="${canvasIndex}" style="display: none;">
             <h2>Upload Images *</h2>
@@ -483,7 +445,7 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
         </div>
     `;
     
-    // Custom Text - với ID unique
+    // Custom Text
     html += `
         <div class="form-section canvas-item" data-canvas="${canvasIndex}" style="display: none;">
             <div class="form-group">
@@ -498,10 +460,10 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
         </div>
     `;
     
-    // Live Preview Box - với ID unique
+    // Live Preview Box
     html += createLivePreviewBox(canvasIndex);
     
-    // Date (not for collage) - với ID unique
+    // Date (not for collage)
     if (!isCollage) {
         html += `
             <div class="form-section canvas-item" data-canvas="${canvasIndex}" id="dateSection-${canvasIndex}" style="display: none;">
@@ -515,7 +477,7 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
         `;
     }
     
-    // Welcome Home (not for collage) - với ID unique
+    // Welcome Home (not for collage)
     if (!isCollage) {
         html += `
             <div class="form-section canvas-item" data-canvas="${canvasIndex}" id="welcomeHomeSection-${canvasIndex}" style="display: none;">
@@ -530,7 +492,7 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
     return html;
 }
 
-// Switch between canvases - UPDATED
+// Switch between canvases
 function switchCanvas(index) {
     // Validate index
     if (index === null || index === undefined || index < 0) return;
@@ -549,12 +511,12 @@ function switchCanvas(index) {
         tab.classList.toggle('active', i === index);
     });
     
-    // QUAN TRỌNG: Ẩn TẤT CẢ canvas items trước
+    // Hide ALL canvas items first
     document.querySelectorAll('.canvas-item').forEach(item => {
         item.style.display = 'none';
     });
     
-    // Chỉ hiển thị canvas items của index được chọn
+    // Show canvas items for selected index
     const itemsToShow = document.querySelectorAll(`[data-canvas="${index}"]`);
     if (itemsToShow.length === 0) {
         console.error(`No canvas items found for index ${index}`);
@@ -676,7 +638,7 @@ function handleTwoPersonChange(canvasIndex) {
     updatePriceDisplay(canvasIndex);
 }
 
-// Update price display - UPDATED
+// Update price display
 function updatePriceDisplay(canvasIndex) {
     const size = selectedSizes[canvasIndex];
     const priceElement = document.getElementById(`selectedPrice-${canvasIndex}`);
@@ -710,7 +672,7 @@ function updatePriceDisplay(canvasIndex) {
     calculateTotalPrice();
 }
 
-// Calculate total price - UPDATED
+// Calculate total price
 function calculateTotalPrice() {
     let total = 0;
     let originalTotal = 0;
@@ -874,39 +836,167 @@ function resetCrop() {
     }
 }
 
-// Apply crop
+// NEW: Helper function to convert blob to base64
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+// NEW: Show image uploading state
+function showImageUploading(canvasIndex, imageIndex) {
+    const container = document.getElementById(`imageThumbnails-${canvasIndex}`);
+    const placeholder = document.createElement('div');
+    placeholder.className = 'thumbnail image-uploading';
+    placeholder.id = `upload-placeholder-${canvasIndex}-${imageIndex}`;
+    placeholder.innerHTML = `
+        <div class="upload-spinner">
+            <div class="loading"></div>
+        </div>
+    `;
+    container.appendChild(placeholder);
+}
+
+// NEW: Hide image uploading state
+function hideImageUploading(canvasIndex, imageIndex) {
+    const placeholder = document.getElementById(`upload-placeholder-${canvasIndex}-${imageIndex}`);
+    if (placeholder) {
+        placeholder.remove();
+    }
+}
+
+// NEW: Show upload error
+function showUploadError(canvasIndex, imageIndex, errorMessage) {
+    const placeholder = document.getElementById(`upload-placeholder-${canvasIndex}-${imageIndex}`);
+    if (placeholder) {
+        placeholder.classList.add('upload-error');
+        placeholder.innerHTML = `
+            <div class="error-message">${errorMessage}</div>
+            <button class="retry-upload-btn" onclick="retryUpload(${canvasIndex}, ${imageIndex})">Retry</button>
+        `;
+    }
+}
+
+// NEW: Upload cropped image immediately
+async function uploadCroppedImage(blob, canvasIndex, imageIndex) {
+    try {
+        // Convert blob to base64
+        const base64 = await blobToBase64(blob);
+        
+        // Create unique filename
+        const timestamp = Date.now();
+        const fileName = `canvas${canvasIndex + 1}_img${imageIndex + 1}_${timestamp}.jpg`;
+        
+        // Call Apps Script to upload
+        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+                action: 'uploadSingle',
+                fileName: fileName,
+                mimeType: 'image/jpeg',
+                data: base64.split(',')[1],
+                canvasIndex: canvasIndex,
+                orderTemp: `temp_${Date.now()}`
+            })
+        });
+        
+        const result = await response.json();
+        
+        if (result.success) {
+            return {
+                url: result.fileUrl,
+                id: result.fileId,
+                size: blob.size,
+                uploadedAt: new Date().toISOString()
+            };
+        }
+        
+        throw new Error(result.error || 'Upload failed');
+        
+    } catch (error) {
+        console.error('Upload error:', error);
+        throw error;
+    }
+}
+
+// UPDATED: Apply crop with dynamic sizing and immediate upload
 function applyCrop() {
     if (!cropper) return;
     
-    // Get cropped canvas
+    // Get crop data
+    const cropData = cropper.getData();
+    const imageData = cropper.getImageData();
+    
+    // Calculate output dimensions based on actual crop area
+    const outputWidth = Math.round(cropData.width);
+    const outputHeight = Math.round(cropData.height);
+    
+    // Optional: Set maximum dimension to prevent extremely large files
+    const MAX_DIMENSION = 4000;
+    let finalWidth = outputWidth;
+    let finalHeight = outputHeight;
+    
+    if (outputWidth > MAX_DIMENSION || outputHeight > MAX_DIMENSION) {
+        const ratio = Math.min(MAX_DIMENSION / outputWidth, MAX_DIMENSION / outputHeight);
+        finalWidth = Math.round(outputWidth * ratio);
+        finalHeight = Math.round(outputHeight * ratio);
+    }
+    
+    // Get cropped canvas with calculated dimensions
     const croppedCanvas = cropper.getCroppedCanvas({
-        width: 800,
-        height: 1000,
+        width: finalWidth,
+        height: finalHeight,
         imageSmoothingEnabled: true,
         imageSmoothingQuality: 'high'
     });
     
-    croppedCanvas.toBlob(function(blob) {
-        // Create file from blob
-        const fileName = `cropped_${Date.now()}_${currentCropIndex}.jpg`;
-        const file = new File([blob], fileName, { type: 'image/jpeg' });
-        
-        // Store the file
-        if (!uploadedImages[currentCanvasIndex]) {
-            uploadedImages[currentCanvasIndex] = [];
+    croppedCanvas.toBlob(async function(blob) {
+        try {
+            // Show loading state
+            const imageIndex = uploadedImages[currentCanvasIndex].length;
+            showImageUploading(currentCanvasIndex, imageIndex);
+            
+            // Upload immediately
+            const uploadResult = await uploadCroppedImage(blob, currentCanvasIndex, imageIndex);
+            
+            // Store link instead of file
+            if (!uploadedImages[currentCanvasIndex]) {
+                uploadedImages[currentCanvasIndex] = [];
+            }
+            
+            uploadedImages[currentCanvasIndex].push({
+                type: 'link',
+                url: uploadResult.url,
+                fileId: uploadResult.id,
+                size: uploadResult.size,
+                uploadedAt: uploadResult.uploadedAt,
+                originalName: pendingFiles[currentCropIndex].name,
+                dimensions: {
+                    width: finalWidth,
+                    height: finalHeight
+                }
+            });
+            
+            // Hide loading and update thumbnails
+            hideImageUploading(currentCanvasIndex, imageIndex);
+            updateThumbnails(currentCanvasIndex);
+            
+            // Close modal
+            closeCropModal();
+            
+            // Process next image
+            currentCropIndex++;
+            processNextImage();
+            
+        } catch (error) {
+            console.error('Upload failed:', error);
+            showUploadError(currentCanvasIndex, uploadedImages[currentCanvasIndex].length, 'Upload failed. Please retry.');
         }
-        uploadedImages[currentCanvasIndex].push(file);
-        
-        // Update thumbnails
-        updateThumbnails(currentCanvasIndex);
-        
-        // Close modal
-        closeCropModal();
-        
-        // Process next image
-        currentCropIndex++;
-        processNextImage();
-    }, 'image/jpeg', 0.9);
+    }, 'image/jpeg', 0.95); // Higher quality: 0.95
 }
 
 // Cancel crop
@@ -928,27 +1018,36 @@ function closeCropModal() {
     }
 }
 
-// Update thumbnails
+// UPDATED: Update thumbnails to show from URLs
 function updateThumbnails(canvasIndex) {
     const container = document.getElementById(`imageThumbnails-${canvasIndex}`);
     container.innerHTML = '';
     
     const images = uploadedImages[canvasIndex] || [];
     
-    images.forEach((file, index) => {
-        const reader = new FileReader();
+    images.forEach((imageData, index) => {
+        const thumbnail = document.createElement('div');
+        thumbnail.className = 'thumbnail';
         
-        reader.onload = function(e) {
-            const thumbnail = document.createElement('div');
-            thumbnail.className = 'thumbnail';
+        if (imageData.type === 'link') {
+            // Display from URL
             thumbnail.innerHTML = `
-                <img src="${e.target.result}" alt="Uploaded image">
+                <img src="${imageData.url}" alt="Uploaded image">
                 <button class="remove-btn" onclick="removeImage(${canvasIndex}, ${index})">×</button>
             `;
-            container.appendChild(thumbnail);
-        };
+        } else {
+            // Legacy support for local files
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                thumbnail.innerHTML = `
+                    <img src="${e.target.result}" alt="Uploaded image">
+                    <button class="remove-btn" onclick="removeImage(${canvasIndex}, ${index})">×</button>
+                `;
+            };
+            reader.readAsDataURL(imageData);
+        }
         
-        reader.readAsDataURL(file);
+        container.appendChild(thumbnail);
     });
 }
 
@@ -1118,7 +1217,7 @@ function showError(elementId, message) {
     }
 }
 
-// Confirm order - UPDATED
+// Confirm order
 function confirmOrder() {
     // Store ALL canvas data before validation
     const canvasType = document.getElementById('canvasType').value;
@@ -1141,7 +1240,7 @@ function confirmOrder() {
     document.getElementById('confirmModal').style.display = 'block';
 }
 
-// Generate order summary - COMPLETELY UPDATED
+// Generate order summary
 function generateOrderSummary() {
     const canvasType = document.getElementById('canvasType').value;
     const canvasCount = canvasType === 'single' ? 1 : parseInt(document.getElementById('canvasQuantity').value);
@@ -1257,7 +1356,111 @@ function closeConfirmModal() {
     document.getElementById('confirmModal').style.display = 'none';
 }
 
-// Submit order
+// NEW: Generate order ID
+function generateOrderId() {
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    return `JM_${timestamp}_${random}`;
+}
+
+// NEW: Prepare order data (replaces prepareFormData)
+function prepareOrderData() {
+    const canvasType = document.getElementById('canvasType').value;
+    const canvasCount = canvasType === 'single' ? 1 : parseInt(document.getElementById('canvasQuantity').value);
+    
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    const orderData = {
+        // Order info
+        orderId: generateOrderId(),
+        timestamp: new Date().toISOString(),
+        
+        // URL parameters
+        psid: urlParams.get('psid') || '',
+        fbName: urlParams.get('fb_name') || document.getElementById('fbName').value,
+        ref: urlParams.get('ref') || '',
+        fbc: urlParams.get('fbc') || '',
+        fbp: urlParams.get('fbp') || '',
+        
+        // Customer info
+        customer: {
+            fbName: document.getElementById('fbName').value,
+            email: document.getElementById('email').value,
+            phone: document.getElementById('phone').value || ''
+        },
+        
+        // Order details
+        notes: document.getElementById('notes').value || '',
+        canvasType: canvasType,
+        canvasCount: canvasCount,
+        
+        // Canvas details
+        canvases: []
+    };
+    
+    // Calculate totals
+    let subtotal = 0;
+    let discountPercent = 0;
+    
+    // Collect details for each canvas
+    for (let i = 0; i < canvasCount; i++) {
+        const size = selectedSizes[i];
+        let price = prices[size];
+        
+        // Add collage fee
+        if (canvasType === 'collage') {
+            price += 5;
+        }
+        
+        // Add two person fee
+        const isTwoPerson = document.getElementById(`twoPersonCanvas-${i}`)?.checked;
+        if (isTwoPerson) {
+            price += 10;
+        }
+        
+        const canvasData = {
+            canvasId: i + 1,
+            type: canvasType,
+            size: size,
+            price: price,
+            customText: document.getElementById(`customText-${i}`)?.value || '',
+            date: document.getElementById(`date-${i}`)?.value || '',
+            welcomeHome: document.getElementById(`welcomeHome-${i}`)?.checked || false,
+            twoPersonCanvas: isTwoPerson || false,
+            images: uploadedImages[i].map(img => ({
+                url: img.url,
+                fileId: img.fileId,
+                size: img.size,
+                dimensions: img.dimensions
+            }))
+        };
+        
+        orderData.canvases.push(canvasData);
+        subtotal += price;
+    }
+    
+    // Apply discount
+    if (canvasCount >= 5) {
+        discountPercent = 12;
+    } else if (canvasCount >= 3) {
+        discountPercent = 5;
+    }
+    
+    const discountAmount = Math.round(subtotal * (discountPercent / 100));
+    const finalTotal = subtotal - discountAmount;
+    
+    // Add pricing info
+    orderData.pricing = {
+        subtotal: subtotal,
+        discountPercent: discountPercent,
+        discountAmount: discountAmount,
+        total: finalTotal
+    };
+    
+    return orderData;
+}
+
+// UPDATED: Submit order (simplified - no image upload needed)
 async function submitOrder() {
     try {
         // Show loading state
@@ -1266,17 +1469,14 @@ async function submitOrder() {
         submitButton.textContent = 'Processing...';
         submitButton.disabled = true;
         
-        // Prepare form data
-        const formData = await prepareFormData();
-        
-        // Upload images to Google Drive
-        const imageUrls = await uploadImagesToGoogleDrive(formData);
-        
-        // Add image URLs to form data
-        formData.imageUrls = imageUrls;
+        // Prepare order data with links
+        const orderData = prepareOrderData();
         
         // Send to N8N webhook
-        await sendToN8N(formData);
+        await sendToN8N(orderData);
+        
+        // Optional: Organize images in Drive
+        await organizeImagesInDrive(orderData);
         
         // Close modal and show thank you page
         closeConfirmModal();
@@ -1293,130 +1493,35 @@ async function submitOrder() {
     }
 }
 
-// Prepare form data
-async function prepareFormData() {
-    const canvasType = document.getElementById('canvasType').value;
-    const canvasCount = canvasType === 'single' ? 1 : parseInt(document.getElementById('canvasQuantity').value);
-    
-    const urlParams = new URLSearchParams(window.location.search);
-    
-    const formData = {
-        // URL parameters
-        psid: urlParams.get('psid') || '',
-        fbName: urlParams.get('fb_name') || document.getElementById('fbName').value,
-        ref: urlParams.get('ref') || '',
-        fbc: urlParams.get('fbc') || '',
-        fbp: urlParams.get('fbp') || '',
+// NEW: Organize images in Drive (move from temp to order folder)
+async function organizeImagesInDrive(orderData) {
+    try {
+        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify({
+                action: 'organizeOrder',
+                orderData: orderData
+            })
+        });
         
-        // Customer info
-        customerFbName: document.getElementById('fbName').value,
-        email: document.getElementById('email').value,
-        phone: document.getElementById('phone').value || '',
-        notes: document.getElementById('notes').value || '',
+        const result = await response.json();
+        return result;
         
-        // Canvas info
-        canvasType: canvasType,
-        canvasCount: canvasCount,
-        totalPrice: document.getElementById('totalPrice').textContent,
-        
-        // Individual canvas details
-        canvasDetails: []
-    };
-    
-    // Collect details for each canvas
-    for (let i = 0; i < canvasCount; i++) {
-        const canvasDetail = {
-            canvasNumber: i + 1,
-            size: selectedSizes[i],
-            price: prices[selectedSizes[i]],
-            twoPersonCanvas: document.getElementById(`twoPersonCanvas-${i}`)?.checked || false,
-            customText: document.getElementById(`customText-${i}`)?.value || '',
-            date: document.getElementById(`date-${i}`)?.value || '',
-            welcomeHome: document.getElementById(`welcomeHome-${i}`)?.checked || false,
-            imageCount: uploadedImages[i]?.length || 0
-        };
-        
-        // Calculate individual canvas price
-        if (canvasType === 'collage') {
-            canvasDetail.price += 5;
-        }
-        if (canvasDetail.twoPersonCanvas) {
-            canvasDetail.price += 10;
-        }
-        
-        formData.canvasDetails.push(canvasDetail);
+    } catch (error) {
+        console.error('Error organizing images:', error);
+        // Non-critical error, don't block order submission
     }
-    
-    // Add timestamp
-    formData.timestamp = new Date().toISOString();
-    
-    return formData;
-}
-
-// Upload images to Google Drive
-async function uploadImagesToGoogleDrive(formData) {
-    const imageUrls = {};
-    const canvasCount = formData.canvasCount;
-    
-    for (let i = 0; i < canvasCount; i++) {
-        const images = uploadedImages[i] || [];
-        imageUrls[`canvas_${i + 1}`] = [];
-        
-        for (let j = 0; j < images.length; j++) {
-            try {
-                const imageUrl = await uploadToGoogleDrive(images[j], `canvas${i + 1}_image${j + 1}`);
-                imageUrls[`canvas_${i + 1}`].push(imageUrl);
-            } catch (error) {
-                console.error(`Error uploading image ${j + 1} for canvas ${i + 1}:`, error);
-            }
-        }
-    }
-    
-    return imageUrls;
-}
-
-// Upload single image to Google Drive
-async function uploadToGoogleDrive(file, fileName) {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        
-        reader.onload = async function(e) {
-            try {
-                const base64Data = e.target.result.split(',')[1];
-                
-                const response = await fetch('https://script.google.com/macros/s/AKfycbygWj_cmQvy29D_K31Kci2g0iBIycf9he2SiRFuU3PsBznjofyZjjQZ-kmDAgRUOzAQ/exec', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        fileName: fileName,
-                        mimeType: file.type,
-                        data: base64Data
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    resolve(result.url);
-                } else {
-                    reject(new Error(result.message || 'Upload failed'));
-                }
-            } catch (error) {
-                reject(error);
-            }
-        };
-        
-        reader.readAsDataURL(file);
-    });
 }
 
 // Send data to N8N webhook
-async function sendToN8N(formData) {
+async function sendToN8N(orderData) {
     const response = await fetch('https://jm9611.duckdns.org/webhook/form-submit', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json'
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(orderData)
     });
     
     if (!response.ok) {

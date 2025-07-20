@@ -432,6 +432,75 @@ body {
     transform: scale(1.1);
 }
 
+/* NEW: Upload Progress Indicator Styles */
+.image-uploading {
+    position: relative;
+    opacity: 0.7;
+    background: #f8f9fa;
+    min-height: 120px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.upload-spinner {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 10;
+}
+
+.upload-error {
+    border: 2px solid #ff4444;
+    background: #ffebee;
+}
+
+.upload-error .error-message {
+    color: #d32f2f;
+    font-size: 12px;
+    padding: 10px;
+    text-align: center;
+}
+
+.retry-upload-btn {
+    background: #ff6b6b;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    margin-top: 8px;
+    transition: all 0.3s ease;
+}
+
+.retry-upload-btn:hover {
+    background: #ff5252;
+    transform: scale(1.05);
+}
+
+/* Upload Status Badge */
+.upload-status {
+    position: absolute;
+    bottom: 5px;
+    right: 5px;
+    background: #2e7d32;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+}
+
+.upload-status.uploading {
+    background: #ff9800;
+}
+
+.upload-status.error {
+    background: #f44336;
+}
+
 /* Character Counter */
 .char-counter {
     text-align: right;
@@ -918,6 +987,24 @@ body {
     background: #e0e0e0;
 }
 
+/* NEW: Crop Modal Loading State */
+.crop-buttons button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.crop-uploading {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.crop-uploading .loading {
+    width: 16px;
+    height: 16px;
+    border-width: 2px;
+}
+
 /* Confirmation Modal */
 .confirm-content {
     max-width: 600px;
@@ -1129,6 +1216,44 @@ body {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* NEW: Upload Progress Bar */
+.upload-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: #e0e0e0;
+    border-radius: 0 0 8px 8px;
+    overflow: hidden;
+}
+
+.upload-progress-bar {
+    height: 100%;
+    background: #2C5F41;
+    width: 0;
+    transition: width 0.3s ease;
+}
+
+/* NEW: Upload Success Animation */
+@keyframes uploadSuccess {
+    0% {
+        transform: scale(0.8);
+        opacity: 0;
+    }
+    50% {
+        transform: scale(1.1);
+    }
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.upload-success {
+    animation: uploadSuccess 0.5s ease;
 }
 
 /* Responsive Design */
