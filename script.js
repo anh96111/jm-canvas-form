@@ -836,7 +836,7 @@ function resetCrop() {
     }
 }
 
-// NEW: Helper function to convert blob to base64
+// Helper function to convert blob to base64
 function blobToBase64(blob) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -846,7 +846,7 @@ function blobToBase64(blob) {
     });
 }
 
-// NEW: Show image uploading state
+// Show image uploading state
 function showImageUploading(canvasIndex, imageIndex) {
     const container = document.getElementById(`imageThumbnails-${canvasIndex}`);
     const placeholder = document.createElement('div');
@@ -860,7 +860,7 @@ function showImageUploading(canvasIndex, imageIndex) {
     container.appendChild(placeholder);
 }
 
-// NEW: Hide image uploading state
+// Hide image uploading state
 function hideImageUploading(canvasIndex, imageIndex) {
     const placeholder = document.getElementById(`upload-placeholder-${canvasIndex}-${imageIndex}`);
     if (placeholder) {
@@ -868,7 +868,7 @@ function hideImageUploading(canvasIndex, imageIndex) {
     }
 }
 
-// NEW: Show upload error
+// Show upload error
 function showUploadError(canvasIndex, imageIndex, errorMessage) {
     const placeholder = document.getElementById(`upload-placeholder-${canvasIndex}-${imageIndex}`);
     if (placeholder) {
@@ -880,52 +880,103 @@ function showUploadError(canvasIndex, imageIndex, errorMessage) {
     }
 }
 
-// NEW: Upload cropped image immediately
-async function uploadCroppedImage(blob, canvasIndex, imageIndex) {
-    try {
-        // Convert blob to base64
-        const base64 = await blobToBase64(blob);
-        
-        // Create unique filename
-        const timestamp = Date.now();
-        const fileName = `canvas${canvasIndex + 1}_img${imageIndex + 1}_${timestamp}.jpg`;
-        
-        // Call Apps Script to upload
-        const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/plain' },
-            body: JSON.stringify({
+// NEW: Upload via iframe method
+async function uploadViaIframe(blob, canvasIndex, imageIndex) {
+    return new Promise(async (resolve, reject) => {
+        try {
+            // Convert blob to base64
+            const base64 = await blobToBase64(blob);
+            const fileName = `canvas${canvasIndex + 1}_img${imageIndex + 1}_${Date.now()}.jpg`;
+            
+            // Create unique callback name
+            const callbackName = 'uploadCallback_' + Date.now();
+            
+            // Create hidden iframe
+            const iframe = document.createElement('iframe');
+            iframe.style.display = 'none';
+            iframe.name = 'upload_iframe_' + Date.now();
+            document.body.appendChild(iframe);
+            
+            // Create form
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = GOOGLE_APPS_SCRIPT_URL;
+            form.target = iframe.name;
+            
+            // Add data
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'data';
+            input.value = JSON.stringify({
                 action: 'uploadSingle',
                 fileName: fileName,
                 mimeType: 'image/jpeg',
                 data: base64.split(',')[1],
                 canvasIndex: canvasIndex,
-                orderTemp: `temp_${Date.now()}`
-            })
-        });
-        
-        const result = await response.json();
-        
-        if (result.success) {
-            return {
-                url: result.fileUrl,
-                id: result.fileId,
-                size: blob.size,
-                uploadedAt: new Date().toISOString()
+                orderTemp: `temp_${Date.now()}`,
+                callbackName: callbackName
+            });
+            
+            form.appendChild(input);
+            document.body.appendChild(form);
+            
+            // Setup timeout
+            let timeout = setTimeout(() => {
+                cleanup();
+                reject(new Error('Upload timeout after 30 seconds'));
+            }, 30000);
+            
+            // Setup callback
+            window[callbackName] = function(result) {
+                clearTimeout(timeout);
+                cleanup();
+                
+                if (result.success) {
+                    resolve({
+                        url: result.fileUrl,
+                        id: result.fileId,
+                        size: blob.size,
+                        uploadedAt: new Date().toISOString()
+                    });
+                } else {
+                    reject(new Error(result.error || 'Upload failed'));
+                }
             };
+            
+            // Cleanup function
+            function cleanup() {
+                delete window[callbackName];
+                if (iframe.parentNode) {
+                    document.body.removeChild(iframe);
+                }
+                if (form.parentNode) {
+                    document.body.removeChild(form);
+                }
+            }
+            
+            // Submit form
+            form.submit();
+            
+        } catch (error) {
+            reject(error);
         }
-        
-        throw new Error(result.error || 'Upload failed');
-        
-    } catch (error) {
-        console.error('Upload error:', error);
-        throw error;
-    }
+    });
 }
 
-// UPDATED: Apply crop with dynamic sizing and immediate upload
+// REPLACED: Apply crop with iframe upload
 function applyCrop() {
     if (!cropper) return;
+    
+    // Disable buttons during upload
+    const applyBtn = document.getElementById('cropApplyBtn');
+    const cancelBtn = document.getElementById('cropCancelBtn');
+    const btnText = document.getElementById('cropBtnText');
+    const btnLoading = document.getElementById('cropBtnLoading');
+    
+    applyBtn.disabled = true;
+    cancelBtn.disabled = true;
+    btnText.style.display = 'none';
+    btnLoading.style.display = 'inline-flex';
     
     // Get crop data
     const cropData = cropper.getData();
@@ -960,8 +1011,8 @@ function applyCrop() {
             const imageIndex = uploadedImages[currentCanvasIndex].length;
             showImageUploading(currentCanvasIndex, imageIndex);
             
-            // Upload immediately
-            const uploadResult = await uploadCroppedImage(blob, currentCanvasIndex, imageIndex);
+            // Upload via iframe method
+            const uploadResult = await uploadViaIframe(blob, currentCanvasIndex, imageIndex);
             
             // Store link instead of file
             if (!uploadedImages[currentCanvasIndex]) {
@@ -994,9 +1045,18 @@ function applyCrop() {
             
         } catch (error) {
             console.error('Upload failed:', error);
+            
+            // Re-enable buttons
+            applyBtn.disabled = false;
+            cancelBtn.disabled = false;
+            btnText.style.display = 'inline';
+            btnLoading.style.display = 'none';
+            
+            // Show error
+            hideImageUploading(currentCanvasIndex, uploadedImages[currentCanvasIndex].length);
             showUploadError(currentCanvasIndex, uploadedImages[currentCanvasIndex].length, 'Upload failed. Please retry.');
         }
-    }, 'image/jpeg', 0.95); // Higher quality: 0.95
+    }, 'image/jpeg', 0.95);
 }
 
 // Cancel crop
@@ -1012,13 +1072,24 @@ function cancelCrop() {
 function closeCropModal() {
     document.getElementById('cropModal').style.display = 'none';
     
+    // Reset button states
+    const applyBtn = document.getElementById('cropApplyBtn');
+    const cancelBtn = document.getElementById('cropCancelBtn');
+    const btnText = document.getElementById('cropBtnText');
+    const btnLoading = document.getElementById('cropBtnLoading');
+    
+    if (applyBtn) applyBtn.disabled = false;
+    if (cancelBtn) cancelBtn.disabled = false;
+    if (btnText) btnText.style.display = 'inline';
+    if (btnLoading) btnLoading.style.display = 'none';
+    
     if (cropper) {
         cropper.destroy();
         cropper = null;
     }
 }
 
-// UPDATED: Update thumbnails to show from URLs
+// Update thumbnails to show from URLs
 function updateThumbnails(canvasIndex) {
     const container = document.getElementById(`imageThumbnails-${canvasIndex}`);
     container.innerHTML = '';
@@ -1356,14 +1427,14 @@ function closeConfirmModal() {
     document.getElementById('confirmModal').style.display = 'none';
 }
 
-// NEW: Generate order ID
+// Generate order ID
 function generateOrderId() {
     const timestamp = Date.now();
     const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
     return `JM_${timestamp}_${random}`;
 }
 
-// NEW: Prepare order data (replaces prepareFormData)
+// Prepare order data (replaces prepareFormData)
 function prepareOrderData() {
     const canvasType = document.getElementById('canvasType').value;
     const canvasCount = canvasType === 'single' ? 1 : parseInt(document.getElementById('canvasQuantity').value);
@@ -1460,7 +1531,7 @@ function prepareOrderData() {
     return orderData;
 }
 
-// UPDATED: Submit order (simplified - no image upload needed)
+// Submit order (simplified - no image upload needed)
 async function submitOrder() {
     try {
         // Show loading state
@@ -1493,7 +1564,7 @@ async function submitOrder() {
     }
 }
 
-// NEW: Organize images in Drive (move from temp to order folder)
+// Organize images in Drive (move from temp to order folder)
 async function organizeImagesInDrive(orderData) {
     try {
         const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
