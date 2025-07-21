@@ -1257,7 +1257,7 @@ function closeConfirmModal() {
     document.getElementById('confirmModal').style.display = 'none';
 }
 
-// Submit order - VERIFIED SOLUTION
+// Submit order - UPDATED WITH FIXES
 async function submitOrder() {
     try {
         // Show loading state
@@ -1271,12 +1271,17 @@ async function submitOrder() {
         const random = Math.random().toString(36).substr(2, 4).toUpperCase();
         const orderId = `JM_${random}`;
         
+        // Get URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        
         // Get canvas info
         const canvasType = document.getElementById('canvasType').value;
         const canvasCount = canvasType === 'single' ? 1 : parseInt(document.getElementById('canvasQuantity').value);
         
-        // Build canvases array matching Apps Script structure
+        // Build canvases array for Apps Script
         const canvases = [];
+        let totalValue = 0;
+        let primarySize = '';
         
         for (let i = 0; i < canvasCount; i++) {
             const images = uploadedImages[i] || [];
@@ -1288,71 +1293,183 @@ async function submitOrder() {
                 base64Images.push(base64);
             }
             
-            // Build canvas object matching Apps Script expectation
+            // Calculate canvas value
+            let canvasValue = prices[selectedSizes[i]];
+            if (canvasType === 'collage') {
+                canvasValue += 5;
+            } else if (document.getElementById(`twoPersonCanvas-${i}`)?.checked) {
+                canvasValue += 10;
+            }
+            
+            totalValue += canvasValue;
+            if (i === 0) primarySize = selectedSizes[i];
+            
+            // Build canvas object for Apps Script
             const canvasData = {
                 canvas_id: i + 1,
                 canvas_type: canvasType,
                 size: selectedSizes[i],
-                value: prices[selectedSizes[i]],
+                value: canvasValue,
                 images: base64Images,
                 custom_text: document.getElementById(`customText-${i}`)?.value || '',
                 date: document.getElementById(`date-${i}`)?.value || '',
                 welcome_home: document.getElementById(`welcomeHome-${i}`)?.checked || false
             };
             
-            // Add two_person_canvas if applicable
-            if (canvasType !== 'collage') {
-                const twoPersonChecked = document.getElementById(`twoPersonCanvas-${i}`)?.checked || false;
-                if (twoPersonChecked) {
-                    canvasData.value += 10; // Add $10 to value
-                }
-            }
-            
             canvases.push(canvasData);
         }
         
-        // Build request data matching Apps Script structure exactly
-        const requestData = {
+        // Apply discounts to get FINAL total
+        let finalTotal = totalValue;
+        if (canvasCount >= 5) {
+            finalTotal = Math.round(totalValue * 0.88); // 12% off
+        } else if (canvasCount >= 3) {
+            finalTotal = Math.round(totalValue * 0.95); // 5% off
+        }
+        
+        // Get customer info
+        const fbName = document.getElementById('fbName').value;
+        const email = document.getElementById('email').value;
+        const phone = document.getElementById('phone').value || '';
+        
+        // Parse name
+        const nameParts = fbName.trim().split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+        
+        // Format submit time
+        const submitTime = new Date().toLocaleString('en-US', {
+            month: '2-digit',
+            day: '2-digit',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+        
+        // 1. FIRST: Send to Google Apps Script
+        const requestDataForAppsScript = {
             order_id: orderId,
             customer_info: {
-                fb_name: document.getElementById('fbName').value,
-                email: document.getElementById('email').value,
-                phone: document.getElementById('phone').value || ''
+                fb_name: fbName,
+                email: email,
+                phone: phone
             },
             canvases: canvases,
             notes: document.getElementById('notes').value || ''
         };
         
-        // Send to Google Apps Script
+        // Send to Apps Script (without no-cors)
         const scriptUrl = 'https://script.google.com/macros/s/AKfycbygWj_cmQvy29D_K31Kci2g0iBIycf9he2SiRFuU3PsBznjofyZjjQZ-kmDAgRUOzAQ/exec';
         
-        // Use fetch with no-cors mode
-        fetch(scriptUrl, {
-            method: 'POST',
-            mode: 'no-cors', // Required for Google Apps Script
-            headers: {
-                'Content-Type': 'text/plain' // Required by Apps Script
-            },
-            body: JSON.stringify(requestData)
-        }).then(() => {
-            // Can't read response in no-cors mode, but request is sent
-            // Wait a bit to ensure processing
-            setTimeout(() => {
-                closeConfirmModal();
-                showThankYouPage();
-            }, 1000);
-        }).catch(error => {
-            console.error('Error submitting order:', error);
-            alert('There was an error submitting your order. Please try again.');
+        try {
+            // Use fetch without no-cors to get response
+            const appsScriptResponse = await fetch(scriptUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestDataForAppsScript)
+            });
             
-            // Reset button
-            submitButton.textContent = originalText;
-            submitButton.disabled = false;
-        });
+            // Try to get response
+            let photoLinks = [];
+            try {
+                const responseData = await appsScriptResponse.json();
+                if (responseData.success && responseData.photo_links) {
+                    photoLinks = responseData.photo_links;
+                }
+            } catch (e) {
+                console.log('Could not parse Apps Script response, continuing anyway');
+            }
+            
+            // Convert photo links to string format for N8N
+            const photoLinksString = JSON.stringify(photoLinks);
+            
+            // 2. SECOND: Send to N8N webhook
+            const n8nData = {
+                order_id: orderId,
+                psid: urlParams.get('psid') || '',
+                fb_name: fbName,
+                first_name: firstName,
+                last_name: lastName,
+                email: email,
+                phone: phone,
+                ref: urlParams.get('ref') || '',
+                fbc: urlParams.get('fbc') || '',
+                fbp: urlParams.get('fbp') || '',
+                product: canvasType === 'single' ? 'Single Canvas' : 
+                        canvasType === 'multi' ? 'Multiple Canvas' : 'Collage Canvas',
+                size: primarySize,
+                value: finalTotal, // Use final total with discounts
+                currency: 'USD',
+                photo_links: photoLinksString,
+                note: document.getElementById('notes').value || '',
+                submit_time: submitTime,
+                status: 'pending'
+            };
+            
+            // Send to N8N
+            const n8nUrl = 'https://jm9611.duckdns.org/webhook/form-submit';
+            
+            // Try to send to N8N, but don't block if it fails
+            fetch(n8nUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(n8nData)
+            }).catch(error => {
+                console.error('Error sending to N8N:', error);
+                // Continue anyway - data is already in Apps Script
+            });
+            
+        } catch (error) {
+            console.error('Error in submission process:', error);
+            // If Apps Script fails, still try to send to N8N with empty photo_links
+            
+            const n8nData = {
+                order_id: orderId,
+                psid: urlParams.get('psid') || '',
+                fb_name: fbName,
+                first_name: firstName,
+                last_name: lastName,
+                email: email,
+                phone: phone,
+                ref: urlParams.get('ref') || '',
+                fbc: urlParams.get('fbc') || '',
+                fbp: urlParams.get('fbp') || '',
+                product: canvasType === 'single' ? 'Single Canvas' : 
+                        canvasType === 'multi' ? 'Multiple Canvas' : 'Collage Canvas',
+                size: primarySize,
+                value: finalTotal, // Use final total with discounts
+                currency: 'USD',
+                photo_links: '[]', // Empty array as string
+                note: document.getElementById('notes').value || '',
+                submit_time: submitTime,
+                status: 'pending'
+            };
+            
+            // Send to N8N anyway
+            fetch('https://jm9611.duckdns.org/webhook/form-submit', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(n8nData)
+            }).catch(err => console.error('N8N error:', err));
+        }
+        
+        // Show success page after a short delay
+        setTimeout(() => {
+            closeConfirmModal();
+            showThankYouPage();
+        }, 1500);
         
     } catch (error) {
         console.error('Error in submitOrder:', error);
-        alert('There was an error processing your order. Please try again.');
+        alert('There was an error submitting your order. Please try again.');
         
         // Reset button
         const submitButton = document.querySelector('#confirmModal .primary-btn');
