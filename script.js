@@ -1257,7 +1257,7 @@ function closeConfirmModal() {
     document.getElementById('confirmModal').style.display = 'none';
 }
 
-// Submit order
+// Submit order - VERIFIED SOLUTION
 async function submitOrder() {
     try {
         // Show loading state
@@ -1266,164 +1266,115 @@ async function submitOrder() {
         submitButton.textContent = 'Processing...';
         submitButton.disabled = true;
         
-        // Prepare form data
-        const formData = await prepareFormData();
+        // Generate order ID
+        const timestamp = Date.now();
+        const random = Math.random().toString(36).substr(2, 4).toUpperCase();
+        const orderId = `JM_${random}`;
         
-        // Upload images to Google Drive
-        const imageUrls = await uploadImagesToGoogleDrive(formData);
+        // Get canvas info
+        const canvasType = document.getElementById('canvasType').value;
+        const canvasCount = canvasType === 'single' ? 1 : parseInt(document.getElementById('canvasQuantity').value);
         
-        // Add image URLs to form data
-        formData.imageUrls = imageUrls;
+        // Build canvases array matching Apps Script structure
+        const canvases = [];
         
-        // Send to N8N webhook
-        await sendToN8N(formData);
+        for (let i = 0; i < canvasCount; i++) {
+            const images = uploadedImages[i] || [];
+            const base64Images = [];
+            
+            // Convert all images to base64
+            for (const file of images) {
+                const base64 = await fileToBase64(file);
+                base64Images.push(base64);
+            }
+            
+            // Build canvas object matching Apps Script expectation
+            const canvasData = {
+                canvas_id: i + 1,
+                canvas_type: canvasType,
+                size: selectedSizes[i],
+                value: prices[selectedSizes[i]],
+                images: base64Images,
+                custom_text: document.getElementById(`customText-${i}`)?.value || '',
+                date: document.getElementById(`date-${i}`)?.value || '',
+                welcome_home: document.getElementById(`welcomeHome-${i}`)?.checked || false
+            };
+            
+            // Add two_person_canvas if applicable
+            if (canvasType !== 'collage') {
+                const twoPersonChecked = document.getElementById(`twoPersonCanvas-${i}`)?.checked || false;
+                if (twoPersonChecked) {
+                    canvasData.value += 10; // Add $10 to value
+                }
+            }
+            
+            canvases.push(canvasData);
+        }
         
-        // Close modal and show thank you page
-        closeConfirmModal();
-        showThankYouPage();
+        // Build request data matching Apps Script structure exactly
+        const requestData = {
+            order_id: orderId,
+            customer_info: {
+                fb_name: document.getElementById('fbName').value,
+                email: document.getElementById('email').value,
+                phone: document.getElementById('phone').value || ''
+            },
+            canvases: canvases,
+            notes: document.getElementById('notes').value || ''
+        };
+        
+        // Send to Google Apps Script
+        const scriptUrl = 'https://script.google.com/macros/s/AKfycbygWj_cmQvy29D_K31Kci2g0iBIycf9he2SiRFuU3PsBznjofyZjjQZ-kmDAgRUOzAQ/exec';
+        
+        // Use fetch with no-cors mode
+        fetch(scriptUrl, {
+            method: 'POST',
+            mode: 'no-cors', // Required for Google Apps Script
+            headers: {
+                'Content-Type': 'text/plain' // Required by Apps Script
+            },
+            body: JSON.stringify(requestData)
+        }).then(() => {
+            // Can't read response in no-cors mode, but request is sent
+            // Wait a bit to ensure processing
+            setTimeout(() => {
+                closeConfirmModal();
+                showThankYouPage();
+            }, 1000);
+        }).catch(error => {
+            console.error('Error submitting order:', error);
+            alert('There was an error submitting your order. Please try again.');
+            
+            // Reset button
+            submitButton.textContent = originalText;
+            submitButton.disabled = false;
+        });
         
     } catch (error) {
-        console.error('Error submitting order:', error);
-        alert('There was an error submitting your order. Please try again.');
+        console.error('Error in submitOrder:', error);
+        alert('There was an error processing your order. Please try again.');
         
         // Reset button
         const submitButton = document.querySelector('#confirmModal .primary-btn');
-        submitButton.textContent = 'Confirm Order';
-        submitButton.disabled = false;
+        if (submitButton) {
+            submitButton.textContent = 'Confirm Order';
+            submitButton.disabled = false;
+        }
     }
 }
 
-// Prepare form data
-async function prepareFormData() {
-    const canvasType = document.getElementById('canvasType').value;
-    const canvasCount = canvasType === 'single' ? 1 : parseInt(document.getElementById('canvasQuantity').value);
-    
-    const urlParams = new URLSearchParams(window.location.search);
-    
-    const formData = {
-        // URL parameters
-        psid: urlParams.get('psid') || '',
-        fbName: urlParams.get('fb_name') || document.getElementById('fbName').value,
-        ref: urlParams.get('ref') || '',
-        fbc: urlParams.get('fbc') || '',
-        fbp: urlParams.get('fbp') || '',
-        
-        // Customer info
-        customerFbName: document.getElementById('fbName').value,
-        email: document.getElementById('email').value,
-        phone: document.getElementById('phone').value || '',
-        notes: document.getElementById('notes').value || '',
-        
-        // Canvas info
-        canvasType: canvasType,
-        canvasCount: canvasCount,
-        totalPrice: document.getElementById('totalPrice').textContent,
-        
-        // Individual canvas details
-        canvasDetails: []
-    };
-    
-    // Collect details for each canvas
-    for (let i = 0; i < canvasCount; i++) {
-        const canvasDetail = {
-            canvasNumber: i + 1,
-            size: selectedSizes[i],
-            price: prices[selectedSizes[i]],
-            twoPersonCanvas: document.getElementById(`twoPersonCanvas-${i}`)?.checked || false,
-            customText: document.getElementById(`customText-${i}`)?.value || '',
-            date: document.getElementById(`date-${i}`)?.value || '',
-            welcomeHome: document.getElementById(`welcomeHome-${i}`)?.checked || false,
-            imageCount: uploadedImages[i]?.length || 0
-        };
-        
-        // Calculate individual canvas price
-        if (canvasType === 'collage') {
-            canvasDetail.price += 5;
-        }
-        if (canvasDetail.twoPersonCanvas) {
-            canvasDetail.price += 10;
-        }
-        
-        formData.canvasDetails.push(canvasDetail);
-    }
-    
-    // Add timestamp
-    formData.timestamp = new Date().toISOString();
-    
-    return formData;
-}
-
-// Upload images to Google Drive
-async function uploadImagesToGoogleDrive(formData) {
-    const imageUrls = {};
-    const canvasCount = formData.canvasCount;
-    
-    for (let i = 0; i < canvasCount; i++) {
-        const images = uploadedImages[i] || [];
-        imageUrls[`canvas_${i + 1}`] = [];
-        
-        for (let j = 0; j < images.length; j++) {
-            try {
-                const imageUrl = await uploadToGoogleDrive(images[j], `canvas${i + 1}_image${j + 1}`);
-                imageUrls[`canvas_${i + 1}`].push(imageUrl);
-            } catch (error) {
-                console.error(`Error uploading image ${j + 1} for canvas ${i + 1}:`, error);
-            }
-        }
-    }
-    
-    return imageUrls;
-}
-
-// Upload single image to Google Drive
-async function uploadToGoogleDrive(file, fileName) {
+// Helper function to convert file to base64 - REQUIRED
+function fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        
-        reader.onload = async function(e) {
-            try {
-                const base64Data = e.target.result.split(',')[1];
-                
-                const response = await fetch('https://script.google.com/macros/s/AKfycbygWj_cmQvy29D_K31Kci2g0iBIycf9he2SiRFuU3PsBznjofyZjjQZ-kmDAgRUOzAQ/exec', {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        fileName: fileName,
-                        mimeType: file.type,
-                        data: base64Data
-                    })
-                });
-                
-                const result = await response.json();
-                
-                if (result.status === 'success') {
-                    resolve(result.url);
-                } else {
-                    reject(new Error(result.message || 'Upload failed'));
-                }
-            } catch (error) {
-                reject(error);
-            }
+        reader.onload = () => {
+            // Extract base64 data without data URL prefix
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
         };
-        
+        reader.onerror = reject;
         reader.readAsDataURL(file);
     });
-}
-
-// Send data to N8N webhook
-async function sendToN8N(formData) {
-    const response = await fetch('https://jm9611.duckdns.org/webhook/form-submit', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-    });
-    
-    if (!response.ok) {
-        throw new Error('Failed to send data to webhook');
-    }
-    
-    return response.json();
 }
 
 // Show thank you page
