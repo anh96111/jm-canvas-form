@@ -86,7 +86,7 @@ function restoreUploadState() {
     }
 }
 
-// NEW: Upload single image to TEMP folder - UPDATED to fix CORS
+// NEW: Upload single image to TEMP folder - UPDATED to fix CORS with FormData
 async function uploadSingleImage(blob, canvasIndex, imageOrder, retries = MAX_UPLOAD_RETRIES) {
     const uploadId = `${canvasIndex}_${imageOrder}`;
     
@@ -112,22 +112,20 @@ async function uploadSingleImage(blob, canvasIndex, imageOrder, retries = MAX_UP
             // Convert blob to base64
             const base64 = await blobToBase64(blob);
             
-            // Send as JSON instead of FormData to fix CORS
+            // Use FormData instead of JSON to avoid CORS preflight
+            const formData = new FormData();
+            formData.append('action', 'upload_temp');
+            formData.append('session_id', session);
+            formData.append('canvas_index', canvasIndex);
+            formData.append('image_order', imageOrder);
+            formData.append('filename', filename);
+            formData.append('image', base64);
+            formData.append('fileSize', blob.size);
+            
+            // Send as FormData - no preflight needed
             const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                mode: 'cors',
-                body: JSON.stringify({
-                    action: 'upload_temp',
-                    session_id: session,
-                    canvas_index: canvasIndex,
-                    image_order: imageOrder,
-                    filename: filename,
-                    image: base64,
-                    fileSize: blob.size // Track file size
-                })
+                body: formData
             });
             
             if (!response.ok) {
@@ -241,7 +239,7 @@ function handleUploadError(canvasIndex, imageIndex, error) {
         if (!thumbnail.querySelector('.retry-btn')) {
             const retryBtn = document.createElement('button');
             retryBtn.className = 'retry-btn';
-            retryBtn.innerHTML = '↻ Retry';
+            retryBtn.innerHTML = '🔄 Retry';
             retryBtn.onclick = () => retryUpload(canvasIndex, imageIndex);
             thumbnail.appendChild(retryBtn);
         }
@@ -1253,7 +1251,7 @@ function updateThumbnails(canvasIndex) {
         
         // Only show remove button if uploaded or failed
         if (imageData.status !== 'uploading') {
-            thumbnailHTML += `<button class="remove-btn" onclick="removeImage(${canvasIndex}, ${index})">✕</button>`;
+            thumbnailHTML += `<button class="remove-btn" onclick="removeImage(${canvasIndex}, ${index})">×</button>`;
         }
         
         thumbnail.innerHTML = thumbnailHTML;
@@ -1608,7 +1606,7 @@ function closeConfirmModal() {
     document.getElementById('confirmModal').style.display = 'none';
 }
 
-// UPDATED: Submit order with new flow
+// UPDATED: Submit order with new flow using FormData
 async function submitOrder() {
     try {
         // Show loading state
@@ -1754,28 +1752,24 @@ async function submitOrder() {
             console.error('N8N error (non-blocking):', error);
         });
         
-        // 2. Organize files in Google Drive (async)
-        const organizeData = {
-            action: 'organize_order',
-            order_id: orderId,
-            session_id: getOrCreateSessionId(),
-            file_mappings: fileMappings,
-            customer_info: {
-                fb_name: fbName,
-                email: email,
-                phone: phone
-            },
-            canvases: canvases,
-            notes: document.getElementById('notes').value || ''
-        };
+        // 2. Organize files in Google Drive using FormData
+        const organizeFormData = new FormData();
+        organizeFormData.append('action', 'organize_order');
+        organizeFormData.append('order_id', orderId);
+        organizeFormData.append('session_id', getOrCreateSessionId());
+        organizeFormData.append('file_mappings', JSON.stringify(fileMappings));
+        organizeFormData.append('customer_info', JSON.stringify({
+            fb_name: fbName,
+            email: email,
+            phone: phone
+        }));
+        organizeFormData.append('canvases', JSON.stringify(canvases));
+        organizeFormData.append('notes', document.getElementById('notes').value || '');
         
         // Send to Apps Script (fire and forget)
         fetch(GOOGLE_APPS_SCRIPT_URL, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(organizeData)
+            body: organizeFormData
         }).catch(error => {
             console.error('GAS organize error (non-blocking):', error);
         });
