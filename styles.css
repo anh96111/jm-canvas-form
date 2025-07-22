@@ -415,6 +415,79 @@ body {
     object-position: center;
 }
 
+/* NEW: Thumbnail states */
+.thumbnail.uploading {
+    opacity: 0.7;
+}
+
+.thumbnail.failed {
+    border-color: #ff4444;
+    background-color: #ffebee;
+}
+
+/* NEW: Upload Progress Styles */
+.upload-progress {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.95);
+    padding: 4px;
+    z-index: 2;
+}
+
+.progress-bar {
+    height: 4px;
+    background: #e0e0e0;
+    border-radius: 2px;
+    overflow: hidden;
+    margin-bottom: 2px;
+}
+
+.progress-fill {
+    height: 100%;
+    background: #2C5F41;
+    transition: width 0.3s ease;
+    border-radius: 2px;
+}
+
+.progress-text {
+    font-size: 10px;
+    text-align: center;
+    color: #666;
+    font-weight: 500;
+}
+
+.upload-progress.completed .progress-fill {
+    background: #4caf50;
+}
+
+.upload-progress.failed .progress-fill {
+    background: #ff4444;
+}
+
+/* NEW: Retry Button */
+.retry-btn {
+    position: absolute;
+    bottom: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #ff4444;
+    color: white;
+    border: none;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    cursor: pointer;
+    z-index: 3;
+    transition: all 0.2s ease;
+}
+
+.retry-btn:hover {
+    background: #d32f2f;
+    transform: translateX(-50%) scale(1.05);
+}
+
 .remove-btn {
     position: absolute;
     top: 3px;
@@ -458,6 +531,14 @@ body {
         font-size: 14px;
         top: 2px;
         right: 2px;
+    }
+    
+    .upload-progress {
+        padding: 2px;
+    }
+    
+    .progress-text {
+        font-size: 9px;
     }
 }
 
@@ -559,6 +640,16 @@ body {
     background-color: #ffebee !important;
     border-color: #ff4444 !important;
     color: #d32f2f !important;
+}
+
+/* NEW: Tab disabled state during upload */
+.tab.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.tab.disabled:hover {
+    background: #f0f0f0;
 }
 
 /* Mini Canvas Navigator */
@@ -693,6 +784,14 @@ body {
     box-shadow: 0 4px 12px rgba(44, 95, 65, 0.3);
 }
 
+/* NEW: Submit button disabled state */
+.submit-btn:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
 /* Validation Errors */
 .validation-error {
     color: #e74c3c;
@@ -706,6 +805,33 @@ body {
     border: 2px solid #ff4444 !important;
     animation: shake 0.5s;
     background-color: #fff5f5;
+}
+
+/* NEW: Upload status indicator */
+.upload-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 12px;
+    margin-top: 5px;
+    padding: 4px 8px;
+    border-radius: 4px;
+    background: #f0f0f0;
+}
+
+.upload-status.uploading {
+    background: #e3f2fd;
+    color: #1976d2;
+}
+
+.upload-status.completed {
+    background: #e8f5e9;
+    color: #2e7d32;
+}
+
+.upload-status.failed {
+    background: #ffebee;
+    color: #d32f2f;
 }
 
 /* Modals */
@@ -910,6 +1036,17 @@ body {
     border-color: #2C5F41;
 }
 
+/* NEW: Crop button disabled state */
+.crop-buttons button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.crop-buttons button:disabled:hover {
+    transform: none;
+    background: #f0f0f0;
+}
+
 @media (max-width: 768px) {
     .crop-wrapper {
         flex-direction: column;
@@ -1075,6 +1212,27 @@ body {
     color: white !important;
 }
 
+/* NEW: Upload summary in order confirmation */
+.upload-summary {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 14px;
+    color: #666;
+}
+
+.upload-summary .upload-icon {
+    font-size: 16px;
+}
+
+.upload-summary.all-uploaded {
+    color: #2e7d32;
+}
+
+.upload-summary.has-pending {
+    color: #ff9800;
+}
+
 /* Responsive adjustments for order summary */
 @media (max-width: 600px) {
     .canvas-summary p strong {
@@ -1158,6 +1316,18 @@ body {
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+}
+
+/* NEW: Inline loading spinner */
+.loading-spinner {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #2C5F41;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-left: 5px;
 }
 
 /* Responsive Design */
@@ -1244,6 +1414,34 @@ body {
 
 .canvas-items-container {
     position: relative;
+}
+
+/* NEW: Session status indicator */
+.session-status {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    color: #666;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    z-index: 999;
+    display: none;
+}
+
+.session-status.active {
+    display: block;
+}
+
+.session-status .session-icon {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #4caf50;
+    border-radius: 50%;
+    margin-right: 5px;
 }
 
 /* Accessibility */

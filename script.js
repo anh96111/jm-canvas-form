@@ -4,9 +4,17 @@ let uploadedImages = {};
 let canvasFormData = {};
 let cropper = null;
 let currentCropIndex = null;
-let currentCanvasIndex = 0; // FIXED: Initialize to 0 instead of null
+let currentCanvasIndex = 0;
 let pendingFiles = [];
 let currentRotation = 0;
+
+// NEW: Session management and upload tracking
+let sessionId = null;
+const uploadState = {
+    pending: new Set(),
+    completed: new Map(),
+    failed: new Map()
+};
 
 // Price configuration
 const prices = {
@@ -16,13 +24,250 @@ const prices = {
     '20x30': 82
 };
 
-// Original price configuration - ADDED
+// Original price configuration
 const originalPrices = {
     '8x10': 54,
     '11x14': 69,
     '16x20': 79,
     '20x30': 115
 };
+
+// Configuration
+const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbygWj_cmQvy29D_K31Kci2g0iBIycf9he2SiRFuU3PsBznjofyZjjQZ-kmDAgRUOzAQ/exec';
+const N8N_WEBHOOK_URL = 'https://jm9611.duckdns.org/webhook/form-submit';
+const MAX_UPLOAD_RETRIES = 3;
+
+// NEW: Session ID management
+function getOrCreateSessionId() {
+    if (!sessionId) {
+        const storedSession = localStorage.getItem('jm_canvas_session');
+        const sessionExpiry = localStorage.getItem('jm_canvas_session_expiry');
+        
+        // Check if stored session is still valid
+        if (storedSession && sessionExpiry && new Date().getTime() < parseInt(sessionExpiry)) {
+            sessionId = storedSession;
+        } else {
+            // Create new session
+            const urlParams = new URLSearchParams(window.location.search);
+            const psid = urlParams.get('psid') || '';
+            sessionId = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}_${psid}`;
+            
+            // Store with 24 hour expiry
+            localStorage.setItem('jm_canvas_session', sessionId);
+            localStorage.setItem('jm_canvas_session_expiry', new Date().getTime() + (24 * 60 * 60 * 1000));
+        }
+        
+        // Restore upload state if exists
+        restoreUploadState();
+    }
+    return sessionId;
+}
+
+// NEW: Save upload state to localStorage
+function saveUploadStateToLocalStorage() {
+    const state = {
+        completed: Array.from(uploadState.completed.entries()),
+        failed: Array.from(uploadState.failed.entries())
+    };
+    localStorage.setItem(`jm_canvas_uploads_${sessionId}`, JSON.stringify(state));
+}
+
+// NEW: Restore upload state from localStorage
+function restoreUploadState() {
+    const savedState = localStorage.getItem(`jm_canvas_uploads_${sessionId}`);
+    if (savedState) {
+        try {
+            const state = JSON.parse(savedState);
+            uploadState.completed = new Map(state.completed);
+            uploadState.failed = new Map(state.failed);
+        } catch (e) {
+            console.error('Failed to restore upload state:', e);
+        }
+    }
+}
+
+// NEW: Upload single image to TEMP folder
+async function uploadSingleImage(blob, canvasIndex, imageOrder, retries = MAX_UPLOAD_RETRIES) {
+    const uploadId = `${canvasIndex}_${imageOrder}`;
+    
+    // Prevent duplicate uploads
+    if (uploadState.pending.has(uploadId)) {
+        console.warn('Upload already in progress:', uploadId);
+        return null;
+    }
+    
+    // Check if already uploaded
+    if (uploadState.completed.has(uploadId)) {
+        console.log('Image already uploaded:', uploadId);
+        return uploadState.completed.get(uploadId);
+    }
+    
+    uploadState.pending.add(uploadId);
+    
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            const session = getOrCreateSessionId();
+            const filename = `canvas_${canvasIndex}_img_${imageOrder}_${Date.now()}.jpg`;
+            
+            // Create FormData for multipart upload
+            const formData = new FormData();
+            formData.append('action', 'upload_temp');
+            formData.append('session_id', session);
+            formData.append('canvas_index', canvasIndex);
+            formData.append('image_order', imageOrder);
+            formData.append('filename', filename);
+            
+            // Convert blob to base64 for Apps Script
+            const base64 = await blobToBase64(blob);
+            formData.append('image', base64);
+            
+            const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
+                method: 'POST',
+                body: formData
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                uploadState.completed.set(uploadId, result.fileId);
+                uploadState.pending.delete(uploadId);
+                saveUploadStateToLocalStorage();
+                return result.fileId;
+            } else {
+                throw new Error(result.error || 'Upload failed');
+            }
+            
+        } catch (error) {
+            console.error(`Upload attempt ${attempt} failed for ${uploadId}:`, error);
+            
+            if (attempt === retries) {
+                uploadState.failed.set(uploadId, error.toString());
+                uploadState.pending.delete(uploadId);
+                throw error;
+            }
+            
+            // Exponential backoff
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, attempt - 1)));
+        }
+    }
+}
+
+// NEW: Convert blob to base64
+function blobToBase64(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+}
+
+// NEW: Show upload progress
+function showUploadProgress(canvasIndex, imageIndex) {
+    const container = document.getElementById(`imageThumbnails-${canvasIndex}`);
+    const thumbnails = container.querySelectorAll('.thumbnail');
+    
+    if (thumbnails[imageIndex]) {
+        const thumbnail = thumbnails[imageIndex];
+        
+        // Add progress bar
+        if (!thumbnail.querySelector('.upload-progress')) {
+            const progressBar = document.createElement('div');
+            progressBar.className = 'upload-progress';
+            progressBar.innerHTML = `
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 0%"></div>
+                </div>
+                <span class="progress-text">Uploading...</span>
+            `;
+            thumbnail.appendChild(progressBar);
+        }
+    }
+}
+
+// NEW: Update upload progress
+function updateUploadProgress(canvasIndex, imageIndex, percent, status = 'uploading') {
+    const container = document.getElementById(`imageThumbnails-${canvasIndex}`);
+    const thumbnails = container.querySelectorAll('.thumbnail');
+    
+    if (thumbnails[imageIndex]) {
+        const thumbnail = thumbnails[imageIndex];
+        const progressBar = thumbnail.querySelector('.upload-progress');
+        
+        if (progressBar) {
+            const fill = progressBar.querySelector('.progress-fill');
+            const text = progressBar.querySelector('.progress-text');
+            
+            fill.style.width = `${percent}%`;
+            
+            if (status === 'completed') {
+                text.textContent = 'Uploaded';
+                progressBar.classList.add('completed');
+                setTimeout(() => {
+                    progressBar.style.display = 'none';
+                }, 2000);
+            } else if (status === 'failed') {
+                text.textContent = 'Failed';
+                progressBar.classList.add('failed');
+            } else {
+                text.textContent = `${Math.round(percent)}%`;
+            }
+        }
+    }
+}
+
+// NEW: Handle upload error
+function handleUploadError(canvasIndex, imageIndex, error) {
+    updateUploadProgress(canvasIndex, imageIndex, 0, 'failed');
+    
+    const container = document.getElementById(`imageThumbnails-${canvasIndex}`);
+    const thumbnails = container.querySelectorAll('.thumbnail');
+    
+    if (thumbnails[imageIndex]) {
+        const thumbnail = thumbnails[imageIndex];
+        
+        // Add retry button
+        if (!thumbnail.querySelector('.retry-btn')) {
+            const retryBtn = document.createElement('button');
+            retryBtn.className = 'retry-btn';
+            retryBtn.innerHTML = '↻ Retry';
+            retryBtn.onclick = () => retryUpload(canvasIndex, imageIndex);
+            thumbnail.appendChild(retryBtn);
+        }
+    }
+}
+
+// NEW: Retry upload
+async function retryUpload(canvasIndex, imageIndex) {
+    const imageData = uploadedImages[canvasIndex][imageIndex];
+    if (!imageData || !imageData.blob) return;
+    
+    try {
+        // Remove retry button
+        const container = document.getElementById(`imageThumbnails-${canvasIndex}`);
+        const thumbnails = container.querySelectorAll('.thumbnail');
+        const retryBtn = thumbnails[imageIndex]?.querySelector('.retry-btn');
+        if (retryBtn) retryBtn.remove();
+        
+        // Show progress
+        showUploadProgress(canvasIndex, imageIndex);
+        updateUploadProgress(canvasIndex, imageIndex, 30);
+        
+        // Upload
+        const fileId = await uploadSingleImage(imageData.blob, canvasIndex, imageIndex);
+        
+        if (fileId) {
+            imageData.fileId = fileId;
+            imageData.status = 'uploaded';
+            updateUploadProgress(canvasIndex, imageIndex, 100, 'completed');
+        }
+    } catch (error) {
+        handleUploadError(canvasIndex, imageIndex, error);
+    }
+}
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
@@ -45,6 +290,9 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('fbName').value = decodeURIComponent(fbName);
     }
     
+    // Initialize session
+    getOrCreateSessionId();
+    
     // Initialize character counter and live preview for canvas 0
     const customTextInput = document.getElementById('customText-0');
     if (customTextInput) {
@@ -65,7 +313,27 @@ document.addEventListener('DOMContentLoaded', function() {
     // Initialize with single canvas
     uploadedImages[0] = [];
     canvasFormData[0] = {};
+    
+    // Restore previous uploads if any
+    restorePreviousUploads();
 });
+
+// NEW: Restore previous uploads from session
+function restorePreviousUploads() {
+    const savedImages = localStorage.getItem(`jm_canvas_images_${sessionId}`);
+    if (savedImages) {
+        try {
+            const images = JSON.parse(savedImages);
+            // Restore image data structure
+            Object.keys(images).forEach(canvasIndex => {
+                uploadedImages[canvasIndex] = images[canvasIndex];
+                updateThumbnails(parseInt(canvasIndex));
+            });
+        } catch (e) {
+            console.error('Failed to restore previous uploads:', e);
+        }
+    }
+}
 
 // Character counter
 function updateCharCount(canvasIndex) {
@@ -111,7 +379,7 @@ function createLivePreviewBox(canvasIndex) {
     `;
 }
 
-// THÊM function mới để update preview cho canvas 0
+// Update preview for canvas 0
 function updateCanvas0Preview() {
     const canvasType = document.getElementById('canvasType').value;
     const isCollage = canvasType === 'collage';
@@ -135,7 +403,7 @@ function updateCanvas0Preview() {
     }
 }
 
-// Canvas type change handler - UPDATED với recreate canvas 0
+// Canvas type change handler
 function handleCanvasTypeChange() {
     const canvasType = document.getElementById('canvasType').value;
     const multiCanvasSection = document.getElementById('multiCanvasSection');
@@ -206,7 +474,7 @@ function updateCollageFields() {
     const canvasType = document.getElementById('canvasType').value;
     const isCollage = canvasType === 'collage';
     
-    // Hide/show fields based on canvas type - INCLUDING canvas 0
+    // Hide/show fields based on canvas type
     document.querySelectorAll('[id^="dateSection-"]').forEach(section => {
         section.style.display = isCollage ? 'none' : 'block';
     });
@@ -230,7 +498,7 @@ function updateCollagePriceDisplay() {
     });
 }
 
-// Reset to single canvas - UPDATED để recreate canvas 0
+// Reset to single canvas
 function resetToSingleCanvas() {
     const container = document.getElementById('canvasItemsContainer');
     
@@ -248,12 +516,6 @@ function resetToSingleCanvas() {
     // Recreate canvas 0
     createCanvasItems(0);
     
-    // Console log verification
-    console.log('=== Single Canvas Reset ===');
-    const canvas0Items = document.querySelectorAll('[data-canvas="0"]');
-    console.log(`Canvas 0 items: ${canvas0Items.length}`);
-    console.log('=== End Reset ===');
-    
     // Show canvas 0 and restore data
     setTimeout(() => {
         switchCanvas(0);
@@ -263,7 +525,7 @@ function resetToSingleCanvas() {
     calculateTotalPrice();
 }
 
-// Update canvas count - UPDATED để recreate tất cả canvas kể cả canvas 0
+// Update canvas count
 function updateCanvasCount() {
     const quantity = parseInt(document.getElementById('canvasQuantity').value);
     const canvasType = document.getElementById('canvasType').value;
@@ -272,14 +534,14 @@ function updateCanvasCount() {
     const miniCanvasNav = document.getElementById('miniCanvasNav');
     const container = document.getElementById('canvasItemsContainer');
     
-    // Store current data của canvas 0 trước khi xóa
+    // Store current data
     storeCanvasData(0);
     
     // Clear existing tabs
     canvasTabs.innerHTML = '';
     miniTabs.innerHTML = '';
     
-    // QUAN TRỌNG: Xóa TẤT CẢ canvas items kể cả canvas 0
+    // Clear ALL canvas items
     container.innerHTML = '';
     
     // Special handling for collage with 1 canvas
@@ -317,7 +579,7 @@ function updateCanvasCount() {
         if (!uploadedImages[i]) uploadedImages[i] = [];
         if (!canvasFormData[i]) canvasFormData[i] = {};
         
-        // Create canvas items - INCLUDING canvas 0
+        // Create canvas items
         createCanvasItems(i);
     }
     
@@ -338,38 +600,6 @@ function updateCanvasCount() {
         currentCanvasIndex = 0;
     }
     
-    // Console log để verify
-    console.log('=== Canvas Creation Verification ===');
-    console.log(`Total canvas requested: ${quantity}`);
-    console.log(`Canvas type: ${canvasType}`);
-    
-    for (let i = 0; i < quantity; i++) {
-        const canvasItems = document.querySelectorAll(`[data-canvas="${i}"]`);
-        console.log(`Canvas ${i}: ${canvasItems.length} items found`);
-        
-        // Verify specific elements
-        const elements = {
-            size: document.querySelector(`[data-canvas="${i}"] .size-grid`),
-            upload: document.getElementById(`imageInput-${i}`),
-            customText: document.getElementById(`customText-${i}`),
-            livePreview: document.getElementById(`livePreview-${i}`),
-            date: document.getElementById(`date-${i}`),
-            welcomeHome: document.getElementById(`welcomeHome-${i}`),
-            twoPersonCanvas: document.getElementById(`twoPersonCanvas-${i}`)
-        };
-        
-        console.log(`Canvas ${i} elements:`, {
-            size: !!elements.size,
-            upload: !!elements.upload,
-            customText: !!elements.customText,
-            livePreview: !!elements.livePreview,
-            date: !!elements.date,
-            welcomeHome: !!elements.welcomeHome,
-            twoPersonCanvas: !!elements.twoPersonCanvas
-        });
-    }
-    console.log('=== End Verification ===');
-    
     // Show current canvas after creation
     setTimeout(() => {
         switchCanvas(currentCanvasIndex);
@@ -383,16 +613,13 @@ function updateCanvasCount() {
     updateCollageFields();
 }
 
-// Create canvas items for a specific index - UPDATED để cho phép tạo canvas 0
+// Create canvas items for a specific index
 function createCanvasItems(canvasIndex) {
-    // Remove the check that prevents canvas 0 creation
-    // if (canvasIndex === 0) return;
-    
     const container = document.getElementById('canvasItemsContainer');
     const canvasType = document.getElementById('canvasType').value;
     const isCollage = canvasType === 'collage';
     
-    // Double check không tạo duplicate
+    // Double check no duplicate
     const existingItems = document.querySelectorAll(`[data-canvas="${canvasIndex}"]`);
     if (existingItems.length > 0) {
         console.warn(`Canvas items for index ${canvasIndex} already exist - removing old ones`);
@@ -422,11 +649,11 @@ function createCanvasItems(canvasIndex) {
     }
 }
 
-// Generate HTML for canvas items - UPDATED với ID chính xác
+// Generate HTML for canvas items
 function generateCanvasHTML(canvasIndex, isCollage = false) {
     let html = '';
     
-    // Size Selection - với data-canvas chính xác
+    // Size Selection
     html += `
         <div class="form-section canvas-item" data-canvas="${canvasIndex}" style="display: none;">
             <h2>Select Size *</h2>
@@ -454,7 +681,7 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
         </div>
     `;
     
-    // Two Person Canvas (not for collage) - với ID unique
+    // Two Person Canvas (not for collage)
     if (!isCollage) {
         html += `
             <div class="form-section canvas-item" data-canvas="${canvasIndex}" id="twoPersonSection-${canvasIndex}" style="display: none;">
@@ -466,7 +693,7 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
         `;
     }
     
-    // Image Upload - với ID unique
+    // Image Upload
     html += `
         <div class="form-section canvas-item" data-canvas="${canvasIndex}" style="display: none;">
             <h2>Upload Images *</h2>
@@ -483,7 +710,7 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
         </div>
     `;
     
-    // Custom Text - với ID unique
+    // Custom Text
     html += `
         <div class="form-section canvas-item" data-canvas="${canvasIndex}" style="display: none;">
             <div class="form-group">
@@ -498,10 +725,10 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
         </div>
     `;
     
-    // Live Preview Box - với ID unique
+    // Live Preview Box
     html += createLivePreviewBox(canvasIndex);
     
-    // Date (not for collage) - với ID unique
+    // Date (not for collage)
     if (!isCollage) {
         html += `
             <div class="form-section canvas-item" data-canvas="${canvasIndex}" id="dateSection-${canvasIndex}" style="display: none;">
@@ -515,7 +742,7 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
         `;
     }
     
-    // Welcome Home (not for collage) - với ID unique
+    // Welcome Home (not for collage)
     if (!isCollage) {
         html += `
             <div class="form-section canvas-item" data-canvas="${canvasIndex}" id="welcomeHomeSection-${canvasIndex}" style="display: none;">
@@ -530,7 +757,7 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
     return html;
 }
 
-// Switch between canvases - UPDATED
+// Switch between canvases
 function switchCanvas(index) {
     // Validate index
     if (index === null || index === undefined || index < 0) return;
@@ -549,12 +776,12 @@ function switchCanvas(index) {
         tab.classList.toggle('active', i === index);
     });
     
-    // QUAN TRỌNG: Ẩn TẤT CẢ canvas items trước
+    // Hide ALL canvas items first
     document.querySelectorAll('.canvas-item').forEach(item => {
         item.style.display = 'none';
     });
     
-    // Chỉ hiển thị canvas items của index được chọn
+    // Show only selected canvas items
     const itemsToShow = document.querySelectorAll(`[data-canvas="${index}"]`);
     if (itemsToShow.length === 0) {
         console.error(`No canvas items found for index ${index}`);
@@ -676,7 +903,7 @@ function handleTwoPersonChange(canvasIndex) {
     updatePriceDisplay(canvasIndex);
 }
 
-// Update price display - UPDATED
+// Update price display
 function updatePriceDisplay(canvasIndex) {
     const size = selectedSizes[canvasIndex];
     const priceElement = document.getElementById(`selectedPrice-${canvasIndex}`);
@@ -710,7 +937,7 @@ function updatePriceDisplay(canvasIndex) {
     calculateTotalPrice();
 }
 
-// Calculate total price - UPDATED
+// Calculate total price
 function calculateTotalPrice() {
     let total = 0;
     let originalTotal = 0;
@@ -874,9 +1101,13 @@ function resetCrop() {
     }
 }
 
-// Apply crop
-function applyCrop() {
+// UPDATED: Apply crop with immediate upload
+async function applyCrop() {
     if (!cropper) return;
+    
+    // Disable crop buttons during processing
+    const cropButtons = document.querySelectorAll('#cropModal button');
+    cropButtons.forEach(btn => btn.disabled = true);
     
     // Get cropped canvas
     const croppedCanvas = cropper.getCroppedCanvas({
@@ -886,27 +1117,81 @@ function applyCrop() {
         imageSmoothingQuality: 'high'
     });
     
-    croppedCanvas.toBlob(function(blob) {
-        // Create file from blob
-        const fileName = `cropped_${Date.now()}_${currentCropIndex}.jpg`;
-        const file = new File([blob], fileName, { type: 'image/jpeg' });
-        
-        // Store the file
-        if (!uploadedImages[currentCanvasIndex]) {
-            uploadedImages[currentCanvasIndex] = [];
+    croppedCanvas.toBlob(async function(blob) {
+        try {
+            // Get current image index
+            const imageIndex = uploadedImages[currentCanvasIndex].length;
+            
+            // Create temporary image data
+            const tempImageData = {
+                blob: blob,
+                status: 'uploading',
+                fileId: null,
+                thumbnail: URL.createObjectURL(blob)
+            };
+            
+            // Add to uploadedImages
+            if (!uploadedImages[currentCanvasIndex]) {
+                uploadedImages[currentCanvasIndex] = [];
+            }
+            uploadedImages[currentCanvasIndex].push(tempImageData);
+            
+            // Update thumbnails immediately
+            updateThumbnails(currentCanvasIndex);
+            
+            // Close modal
+            closeCropModal();
+            
+            // Show upload progress
+            showUploadProgress(currentCanvasIndex, imageIndex);
+            updateUploadProgress(currentCanvasIndex, imageIndex, 20);
+            
+            // Upload to TEMP folder
+            try {
+                const fileId = await uploadSingleImage(blob, currentCanvasIndex, imageIndex);
+                
+                if (fileId) {
+                    // Update image data with fileId
+                    tempImageData.fileId = fileId;
+                    tempImageData.status = 'uploaded';
+                    updateUploadProgress(currentCanvasIndex, imageIndex, 100, 'completed');
+                    
+                    // Save to localStorage
+                    saveImagesToLocalStorage();
+                }
+            } catch (uploadError) {
+                console.error('Upload failed:', uploadError);
+                tempImageData.status = 'failed';
+                handleUploadError(currentCanvasIndex, imageIndex, uploadError);
+            }
+            
+            // Process next image
+            currentCropIndex++;
+            processNextImage();
+            
+        } catch (error) {
+            console.error('Error processing crop:', error);
+            alert('Error processing image. Please try again.');
+            
+            // Re-enable buttons
+            cropButtons.forEach(btn => btn.disabled = false);
         }
-        uploadedImages[currentCanvasIndex].push(file);
-        
-        // Update thumbnails
-        updateThumbnails(currentCanvasIndex);
-        
-        // Close modal
-        closeCropModal();
-        
-        // Process next image
-        currentCropIndex++;
-        processNextImage();
     }, 'image/jpeg', 0.9);
+}
+
+// NEW: Save images to localStorage
+function saveImagesToLocalStorage() {
+    const imagesToSave = {};
+    
+    Object.keys(uploadedImages).forEach(canvasIndex => {
+        imagesToSave[canvasIndex] = uploadedImages[canvasIndex].map(img => ({
+            fileId: img.fileId,
+            status: img.status,
+            thumbnail: img.thumbnail
+        }));
+    });
+    
+    localStorage.setItem(`jm_canvas_images_${sessionId}`, JSON.stringify(imagesToSave));
 }
 
 // Cancel crop
@@ -928,37 +1213,62 @@ function closeCropModal() {
     }
 }
 
-// Update thumbnails
+// UPDATED: Update thumbnails with upload status
 function updateThumbnails(canvasIndex) {
     const container = document.getElementById(`imageThumbnails-${canvasIndex}`);
     container.innerHTML = '';
     
     const images = uploadedImages[canvasIndex] || [];
     
-    images.forEach((file, index) => {
-        const reader = new FileReader();
+    images.forEach((imageData, index) => {
+        const thumbnail = document.createElement('div');
+        thumbnail.className = 'thumbnail';
         
-        reader.onload = function(e) {
-            const thumbnail = document.createElement('div');
-            thumbnail.className = 'thumbnail';
-            thumbnail.innerHTML = `
-                <img src="${e.target.result}" alt="Uploaded image">
-                <button class="remove-btn" onclick="removeImage(${canvasIndex}, ${index})">×</button>
-            `;
-            container.appendChild(thumbnail);
-        };
+        // Add status class
+        if (imageData.status === 'uploading') {
+            thumbnail.classList.add('uploading');
+        } else if (imageData.status === 'failed') {
+            thumbnail.classList.add('failed');
+        }
         
-        reader.readAsDataURL(file);
+        let thumbnailHTML = `<img src="${imageData.thumbnail}" alt="Uploaded image">`;
+        
+        // Only show remove button if uploaded or failed
+        if (imageData.status !== 'uploading') {
+            thumbnailHTML += `<button class="remove-btn" onclick="removeImage(${canvasIndex}, ${index})">×</button>`;
+        }
+        
+        thumbnail.innerHTML = thumbnailHTML;
+        container.appendChild(thumbnail);
     });
 }
 
-// Remove image
+// UPDATED: Remove image with cleanup
 function removeImage(canvasIndex, imageIndex) {
+    const imageData = uploadedImages[canvasIndex][imageIndex];
+    
+    // Revoke blob URL if exists
+    if (imageData.thumbnail && imageData.thumbnail.startsWith('blob:')) {
+        URL.revokeObjectURL(imageData.thumbnail);
+    }
+    
+    // Remove from array
     uploadedImages[canvasIndex].splice(imageIndex, 1);
+    
+    // Update upload state
+    const uploadId = `${canvasIndex}_${imageIndex}`;
+    uploadState.completed.delete(uploadId);
+    uploadState.failed.delete(uploadId);
+    
+    // Save to localStorage
+    saveImagesToLocalStorage();
+    saveUploadStateToLocalStorage();
+    
+    // Update thumbnails
     updateThumbnails(canvasIndex);
 }
 
-// Validate form with error modal
+// UPDATED: Validate form with upload check
 function validateForm() {
     let isValid = true;
     const errors = [];
@@ -989,13 +1299,36 @@ function validateForm() {
         }
 
         // Check image upload
-        if (!uploadedImages[i] || uploadedImages[i].length === 0) {
+        const images = uploadedImages[i] || [];
+        if (images.length === 0) {
             isValid = false;
             errors.push({
                 canvas: i,
                 field: 'images',
                 message: `Canvas ${canvasNum}: Please upload at least one image`
             });
+        } else {
+            // NEW: Check if all images are uploaded
+            const pendingUploads = images.filter(img => img.status === 'uploading');
+            const failedUploads = images.filter(img => img.status === 'failed');
+            
+            if (pendingUploads.length > 0) {
+                isValid = false;
+                errors.push({
+                    canvas: i,
+                    field: 'images',
+                    message: `Canvas ${canvasNum}: ${pendingUploads.length} image(s) still uploading`
+                });
+            }
+            
+            if (failedUploads.length > 0) {
+                isValid = false;
+                errors.push({
+                    canvas: i,
+                    field: 'images',
+                    message: `Canvas ${canvasNum}: ${failedUploads.length} image(s) failed to upload`
+                });
+            }
         }
     }
 
@@ -1118,7 +1451,7 @@ function showError(elementId, message) {
     }
 }
 
-// Confirm order - UPDATED
+// Confirm order
 function confirmOrder() {
     // Store ALL canvas data before validation
     const canvasType = document.getElementById('canvasType').value;
@@ -1141,7 +1474,7 @@ function confirmOrder() {
     document.getElementById('confirmModal').style.display = 'block';
 }
 
-// Generate order summary - COMPLETELY UPDATED
+// Generate order summary
 function generateOrderSummary() {
     const canvasType = document.getElementById('canvasType').value;
     const canvasCount = canvasType === 'single' ? 1 : parseInt(document.getElementById('canvasQuantity').value);
@@ -1257,7 +1590,7 @@ function closeConfirmModal() {
     document.getElementById('confirmModal').style.display = 'none';
 }
 
-// Submit order - UPDATED WITH NEW ORDER ID FORMAT
+// UPDATED: Submit order with new flow
 async function submitOrder() {
     try {
         // Show loading state
@@ -1266,10 +1599,10 @@ async function submitOrder() {
         submitButton.textContent = 'Processing...';
         submitButton.disabled = true;
         
-        // Generate order ID với format mới: JM_fbname_YYYYMMDD_HHMMSS_MS
+        // Generate order ID
         const fbName = document.getElementById('fbName').value;
         
-        // Chuẩn hóa tên FB cho Order ID
+        // Normalize FB name for Order ID
         const normalizedName = fbName
             .trim()
             .toLowerCase()
@@ -1304,20 +1637,17 @@ async function submitOrder() {
         const canvasType = document.getElementById('canvasType').value;
         const canvasCount = canvasType === 'single' ? 1 : parseInt(document.getElementById('canvasQuantity').value);
         
-        // Build canvases array for Apps Script
+        // Build file mappings for Apps Script
+        const fileMappings = {};
         const canvases = [];
         let totalValue = 0;
         let primarySize = '';
         
         for (let i = 0; i < canvasCount; i++) {
             const images = uploadedImages[i] || [];
-            const base64Images = [];
+            const fileIds = images.map(img => img.fileId).filter(id => id);
             
-            // Convert all images to base64
-            for (const file of images) {
-                const base64 = await fileToBase64(file);
-                base64Images.push(base64);
-            }
+            fileMappings[`canvas_${i}`] = fileIds;
             
             // Calculate canvas value
             let canvasValue = prices[selectedSizes[i]];
@@ -1330,13 +1660,12 @@ async function submitOrder() {
             totalValue += canvasValue;
             if (i === 0) primarySize = selectedSizes[i];
             
-            // Build canvas object for Apps Script
+            // Build canvas object
             const canvasData = {
                 canvas_id: i + 1,
                 canvas_type: canvasType,
                 size: selectedSizes[i],
                 value: canvasValue,
-                images: base64Images,
                 custom_text: document.getElementById(`customText-${i}`)?.value || '',
                 date: document.getElementById(`date-${i}`)?.value || '',
                 welcome_home: document.getElementById(`welcomeHome-${i}`)?.checked || false
@@ -1373,9 +1702,46 @@ async function submitOrder() {
             hour12: false
         });
         
-        // 1. FIRST: Send to Google Apps Script
-        const requestDataForAppsScript = {
+        // 1. Send to N8N webhook IMMEDIATELY
+        const n8nData = {
             order_id: orderId,
+            psid: urlParams.get('psid') || '',
+            fb_name: fbName,
+            first_name: firstName,
+            last_name: lastName,
+            email: email,
+            phone: phone,
+            ref: urlParams.get('ref') || '',
+            fbc: urlParams.get('fbc') || '',
+            fbp: urlParams.get('fbp') || '',
+            product: canvasType === 'single' ? 'Single Canvas' : 
+                    canvasType === 'multi' ? 'Multiple Canvas' : 'Collage Canvas',
+            size: primarySize,
+            value: finalTotal,
+            currency: 'USD',
+            photo_links: '[]', // Always empty as requested
+            note: document.getElementById('notes').value || '',
+            submit_time: submitTime,
+            status: 'pending'
+        };
+        
+        // Send to N8N (fire and forget)
+        fetch(N8N_WEBHOOK_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(n8nData)
+        }).catch(error => {
+            console.error('N8N error (non-blocking):', error);
+        });
+        
+        // 2. Organize files in Google Drive (async)
+        const organizeData = {
+            action: 'organize_order',
+            order_id: orderId,
+            session_id: getOrCreateSessionId(),
+            file_mappings: fileMappings,
             customer_info: {
                 fb_name: fbName,
                 email: email,
@@ -1385,112 +1751,28 @@ async function submitOrder() {
             notes: document.getElementById('notes').value || ''
         };
         
-        // Send to Apps Script (without no-cors)
-        const scriptUrl = 'https://script.google.com/macros/s/AKfycbygWj_cmQvy29D_K31Kci2g0iBIycf9he2SiRFuU3PsBznjofyZjjQZ-kmDAgRUOzAQ/exec';
+        // Send to Apps Script (fire and forget)
+        fetch(GOOGLE_APPS_SCRIPT_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(organizeData)
+        }).catch(error => {
+            console.error('GAS organize error (non-blocking):', error);
+        });
         
-        try {
-            // Use fetch without no-cors to get response
-            const appsScriptResponse = await fetch(scriptUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(requestDataForAppsScript)
-            });
-            
-            // Try to get response
-            let photoLinks = [];
-            try {
-                const responseData = await appsScriptResponse.json();
-                if (responseData.success && responseData.photo_links) {
-                    photoLinks = responseData.photo_links;
-                }
-            } catch (e) {
-                console.log('Could not parse Apps Script response, continuing anyway');
-            }
-            
-            // Convert photo links to string format for N8N
-            const photoLinksString = JSON.stringify(photoLinks);
-            
-            // 2. SECOND: Send to N8N webhook
-            const n8nData = {
-                order_id: orderId,
-                psid: urlParams.get('psid') || '',
-                fb_name: fbName,
-                first_name: firstName,
-                last_name: lastName,
-                email: email,
-                phone: phone,
-                ref: urlParams.get('ref') || '',
-                fbc: urlParams.get('fbc') || '',
-                fbp: urlParams.get('fbp') || '',
-                product: canvasType === 'single' ? 'Single Canvas' : 
-                        canvasType === 'multi' ? 'Multiple Canvas' : 'Collage Canvas',
-                size: primarySize,
-                value: finalTotal, // Use final total with discounts
-                currency: 'USD',
-                photo_links: photoLinksString,
-                note: document.getElementById('notes').value || '',
-                submit_time: submitTime,
-                status: 'pending'
-            };
-            
-            // Send to N8N
-            const n8nUrl = 'https://jm9611.duckdns.org/webhook/form-submit';
-            
-            // Try to send to N8N, but don't block if it fails
-            fetch(n8nUrl, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(n8nData)
-            }).catch(error => {
-                console.error('Error sending to N8N:', error);
-                // Continue anyway - data is already in Apps Script
-            });
-            
-        } catch (error) {
-            console.error('Error in submission process:', error);
-            // If Apps Script fails, still try to send to N8N with empty photo_links
-            
-            const n8nData = {
-                order_id: orderId,
-                psid: urlParams.get('psid') || '',
-                fb_name: fbName,
-                first_name: firstName,
-                last_name: lastName,
-                email: email,
-                phone: phone,
-                ref: urlParams.get('ref') || '',
-                fbc: urlParams.get('fbc') || '',
-                fbp: urlParams.get('fbp') || '',
-                product: canvasType === 'single' ? 'Single Canvas' : 
-                        canvasType === 'multi' ? 'Multiple Canvas' : 'Collage Canvas',
-                size: primarySize,
-                value: finalTotal, // Use final total with discounts
-                currency: 'USD',
-                photo_links: '[]', // Empty array as string
-                note: document.getElementById('notes').value || '',
-                submit_time: submitTime,
-                status: 'pending'
-            };
-            
-            // Send to N8N anyway
-            fetch('https://jm9611.duckdns.org/webhook/form-submit', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(n8nData)
-            }).catch(err => console.error('N8N error:', err));
-        }
+        // 3. Clear session data
+        localStorage.removeItem(`jm_canvas_images_${sessionId}`);
+        localStorage.removeItem(`jm_canvas_uploads_${sessionId}`);
+        localStorage.removeItem('jm_canvas_session');
+        localStorage.removeItem('jm_canvas_session_expiry');
         
-        // Show success page after a short delay
+        // 4. Show success page immediately
         setTimeout(() => {
             closeConfirmModal();
             showThankYouPage();
-        }, 1500);
+        }, 500);
         
     } catch (error) {
         console.error('Error in submitOrder:', error);
@@ -1505,7 +1787,7 @@ async function submitOrder() {
     }
 }
 
-// Helper function to convert file to base64 - REQUIRED
+// Helper function to convert file to base64
 function fileToBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -1532,6 +1814,15 @@ function startNewOrder() {
     uploadedImages = { 0: [] };
     canvasFormData = { 0: {} };
     currentCanvasIndex = 0;
+    
+    // Clear upload state
+    uploadState.pending.clear();
+    uploadState.completed.clear();
+    uploadState.failed.clear();
+    
+    // Generate new session
+    sessionId = null;
+    getOrCreateSessionId();
     
     // Reset form
     document.getElementById('canvasType').value = 'single';

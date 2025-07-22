@@ -42,6 +42,12 @@
             </div>
         </div>
 
+        <!-- Session Status Indicator (NEW) -->
+        <div id="sessionStatus" class="session-status">
+            <span class="session-icon"></span>
+            <span>Session Active</span>
+        </div>
+
         <!-- Main Content Container -->
         <div class="main-content">
             <!-- Form Container -->
@@ -139,7 +145,14 @@
                             
                             <!-- Image Thumbnails -->
                             <div class="image-thumbnails" id="imageThumbnails-0">
-                                <!-- Thumbnails will be added here -->
+                                <!-- Thumbnails will be added here dynamically -->
+                            </div>
+                            
+                            <!-- Upload Status (NEW) -->
+                            <div id="uploadStatus-0" class="upload-status" style="display: none;">
+                                <span class="upload-icon">📤</span>
+                                <span class="status-text">Uploading...</span>
+                                <span class="loading-spinner"></span>
                             </div>
                         </div>
                         <div class="validation-error" id="image-error-0"></div>
@@ -220,14 +233,14 @@
                     </div>
                 </div>
 
-                <!-- Price Summary - UPDATED -->
+                <!-- Price Summary -->
                 <div class="price-summary-bottom">
                     <span>Estimated Total</span>: 
                     <span class="total-price-display" id="totalPrice">$0</span>
                 </div>
 
                 <!-- Submit Button -->
-                <button class="submit-btn" onclick="confirmOrder()">Submit Order</button>
+                <button class="submit-btn" id="submitBtn" onclick="confirmOrder()">Submit Order</button>
             </div>
         </div>
     </div>
@@ -307,6 +320,20 @@
                         <p>✅ Finalize your order and we'll take care of the rest.</p>
                     </div>
                 </div>
+
+                <!-- NEW: Upload Info Section -->
+                <div class="faq-item">
+                    <div class="faq-question" onclick="toggleFAQ(this)">
+                        <span>📤 <strong>Image Upload</strong></span>
+                        <span class="faq-toggle">+</span>
+                    </div>
+                    <div class="faq-answer">
+                        <p><strong>Auto Upload:</strong> Images are uploaded automatically after cropping</p>
+                        <p><strong>Progress Tracking:</strong> See upload progress for each image</p>
+                        <p><strong>Retry Option:</strong> Failed uploads can be retried</p>
+                        <p><strong>Session Recovery:</strong> Your uploads are saved if you refresh the page</p>
+                    </div>
+                </div>
             </div>
             <div class="faq-footer">
                 <button onclick="closeFAQ()" class="primary-btn">Back to Form</button>
@@ -335,8 +362,12 @@
                 </div>
             </div>
             <div class="crop-buttons">
-                <button onclick="cancelCrop()">Cancel</button>
-                <button onclick="applyCrop()" class="primary-btn">Apply Crop</button>
+                <button onclick="cancelCrop()" id="cropCancelBtn">Cancel</button>
+                <button onclick="applyCrop()" class="primary-btn" id="cropApplyBtn">Apply Crop</button>
+            </div>
+            <!-- NEW: Crop status -->
+            <div id="cropStatus" style="display: none; text-align: center; padding: 10px; color: #666;">
+                <span class="loading-spinner"></span> Processing image...
             </div>
         </div>
     </div>
@@ -346,9 +377,16 @@
         <div class="modal-content confirm-content">
             <h3>Review Your Order</h3>
             <div id="orderSummary"></div>
+            <!-- NEW: Upload summary in confirmation -->
+            <div id="uploadSummaryStatus" style="padding: 0 30px 10px; display: none;">
+                <div class="upload-summary">
+                    <span class="upload-icon">📤</span>
+                    <span>All images uploaded successfully</span>
+                </div>
+            </div>
             <div class="confirm-buttons">
                 <button onclick="closeConfirmModal()">Go Back</button>
-                <button onclick="submitOrder()" class="primary-btn">Confirm Order</button>
+                <button onclick="submitOrder()" class="primary-btn" id="confirmSubmitBtn">Confirm Order</button>
             </div>
         </div>
     </div>
@@ -362,6 +400,14 @@
                 Your order has been received successfully. We'll send your canvas preview to your email and Messenger within 2-3 business days.
             </p>
             <button onclick="startNewOrder()" class="primary-btn">Place Another Order</button>
+        </div>
+    </div>
+
+    <!-- Loading Overlay (NEW) -->
+    <div id="loadingOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center;">
+        <div style="background: white; padding: 20px; border-radius: 8px; text-align: center;">
+            <div class="loading"></div>
+            <p style="margin-top: 10px;">Processing your order...</p>
         </div>
     </div>
 
@@ -416,6 +462,48 @@
                     const datePreview = document.getElementById('previewDate-0');
                     if (datePreview) datePreview.style.display = 'block';
                 }
+            }
+        }
+
+        // NEW: Show session status indicator
+        function updateSessionStatus(active) {
+            const sessionStatus = document.getElementById('sessionStatus');
+            if (sessionStatus) {
+                sessionStatus.classList.toggle('active', active);
+            }
+        }
+
+        // NEW: Update upload status display
+        function updateUploadStatusDisplay(canvasIndex, status, text) {
+            const statusElement = document.getElementById(`uploadStatus-${canvasIndex}`);
+            if (statusElement) {
+                statusElement.style.display = status ? 'inline-flex' : 'none';
+                if (status) {
+                    statusElement.className = `upload-status ${status}`;
+                    const statusText = statusElement.querySelector('.status-text');
+                    if (statusText) statusText.textContent = text;
+                }
+            }
+        }
+
+        // NEW: Update submit button state
+        function updateSubmitButtonState(enabled) {
+            const submitBtn = document.getElementById('submitBtn');
+            if (submitBtn) {
+                submitBtn.disabled = !enabled;
+                if (!enabled) {
+                    submitBtn.innerHTML = 'Submit Order <span class="loading-spinner"></span>';
+                } else {
+                    submitBtn.innerHTML = 'Submit Order';
+                }
+            }
+        }
+
+        // NEW: Show/hide loading overlay
+        function showLoadingOverlay(show) {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) {
+                overlay.style.display = show ? 'flex' : 'none';
             }
         }
     </script>
