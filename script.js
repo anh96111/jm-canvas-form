@@ -86,7 +86,7 @@ function restoreUploadState() {
     }
 }
 
-// NEW: Upload single image to TEMP folder
+// NEW: Upload single image to TEMP folder - UPDATED to fix CORS
 async function uploadSingleImage(blob, canvasIndex, imageOrder, retries = MAX_UPLOAD_RETRIES) {
     const uploadId = `${canvasIndex}_${imageOrder}`;
     
@@ -109,22 +109,30 @@ async function uploadSingleImage(blob, canvasIndex, imageOrder, retries = MAX_UP
             const session = getOrCreateSessionId();
             const filename = `canvas_${canvasIndex}_img_${imageOrder}_${Date.now()}.jpg`;
             
-            // Create FormData for multipart upload
-            const formData = new FormData();
-            formData.append('action', 'upload_temp');
-            formData.append('session_id', session);
-            formData.append('canvas_index', canvasIndex);
-            formData.append('image_order', imageOrder);
-            formData.append('filename', filename);
-            
-            // Convert blob to base64 for Apps Script
+            // Convert blob to base64
             const base64 = await blobToBase64(blob);
-            formData.append('image', base64);
             
+            // Send as JSON instead of FormData to fix CORS
             const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
                 method: 'POST',
-                body: formData
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                mode: 'cors',
+                body: JSON.stringify({
+                    action: 'upload_temp',
+                    session_id: session,
+                    canvas_index: canvasIndex,
+                    image_order: imageOrder,
+                    filename: filename,
+                    image: base64,
+                    fileSize: blob.size // Track file size
+                })
             });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
             
             const result = await response.json();
             
@@ -1101,7 +1109,7 @@ function resetCrop() {
     }
 }
 
-// UPDATED: Apply crop with immediate upload
+// UPDATED: Apply crop with immediate upload - Keep highest quality
 async function applyCrop() {
     if (!cropper) return;
     
@@ -1109,25 +1117,35 @@ async function applyCrop() {
     const cropButtons = document.querySelectorAll('#cropModal button');
     cropButtons.forEach(btn => btn.disabled = true);
     
-    // Get cropped canvas
+    // Get cropped canvas với kích thước gốc (không giới hạn)
     const croppedCanvas = cropper.getCroppedCanvas({
-        width: 800,
-        height: 1000,
+        // Không set width/height cố định - giữ nguyên tỷ lệ 8:10 với resolution cao nhất
         imageSmoothingEnabled: true,
         imageSmoothingQuality: 'high'
     });
     
+    // Convert to blob với chất lượng cao nhất
     croppedCanvas.toBlob(async function(blob) {
         try {
             // Get current image index
             const imageIndex = uploadedImages[currentCanvasIndex].length;
+            
+            // Check file size (optional warning)
+            if (blob.size > 10 * 1024 * 1024) { // 10MB
+                console.warn('Large file size:', (blob.size / 1024 / 1024).toFixed(2) + 'MB');
+            }
             
             // Create temporary image data
             const tempImageData = {
                 blob: blob,
                 status: 'uploading',
                 fileId: null,
-                thumbnail: URL.createObjectURL(blob)
+                thumbnail: URL.createObjectURL(blob),
+                fileSize: blob.size,
+                originalDimensions: {
+                    width: croppedCanvas.width,
+                    height: croppedCanvas.height
+                }
             };
             
             // Add to uploadedImages
@@ -1176,7 +1194,7 @@ async function applyCrop() {
             // Re-enable buttons
             cropButtons.forEach(btn => btn.disabled = false);
         }
-    }, 'image/jpeg', 0.9);
+    }, 'image/jpeg', 0.95); // Chất lượng JPEG 95%
 }
 
 // NEW: Save images to localStorage
@@ -1235,7 +1253,7 @@ function updateThumbnails(canvasIndex) {
         
         // Only show remove button if uploaded or failed
         if (imageData.status !== 'uploading') {
-            thumbnailHTML += `<button class="remove-btn" onclick="removeImage(${canvasIndex}, ${index})">×</button>`;
+            thumbnailHTML += `<button class="remove-btn" onclick="removeImage(${canvasIndex}, ${index})">✕</button>`;
         }
         
         thumbnail.innerHTML = thumbnailHTML;
