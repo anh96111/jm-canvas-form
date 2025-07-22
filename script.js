@@ -33,7 +33,7 @@ const originalPrices = {
 };
 
 // Configuration
-const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbygWj_cmQvy29D_K31Kci2g0iBIycf9he2SiRFuU3PsBznjofyZjjQZ-kmDAgRUOzAQ/exec';
+const GOOGLE_APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbxtof98gf5yzWgOlFNdWmaWo5dwd1eF4tIIM5gQ6BHiy9J1kDyPZYL3wEiljt6y9ZMC/exec';
 const N8N_WEBHOOK_URL = 'https://jm9611.duckdns.org/webhook/form-submit';
 const MAX_UPLOAD_RETRIES = 3;
 
