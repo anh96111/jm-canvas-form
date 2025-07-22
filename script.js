@@ -86,7 +86,7 @@ function restoreUploadState() {
     }
 }
 
-// NEW: Upload single image to TEMP folder - UPDATED to fix CORS with FormData
+// NEW: Upload single image to TEMP folder - ENHANCED ERROR HANDLING
 async function uploadSingleImage(blob, canvasIndex, imageOrder, retries = MAX_UPLOAD_RETRIES) {
     const uploadId = `${canvasIndex}_${imageOrder}`;
     
@@ -112,7 +112,7 @@ async function uploadSingleImage(blob, canvasIndex, imageOrder, retries = MAX_UP
             // Convert blob to base64
             const base64 = await blobToBase64(blob);
             
-            // Use FormData instead of JSON to avoid CORS preflight
+            // Use FormData to avoid CORS
             const formData = new FormData();
             formData.append('action', 'upload_temp');
             formData.append('session_id', session);
@@ -122,14 +122,27 @@ async function uploadSingleImage(blob, canvasIndex, imageOrder, retries = MAX_UP
             formData.append('image', base64);
             formData.append('fileSize', blob.size);
             
-            // Send as FormData - no preflight needed
+            console.log(`Upload attempt ${attempt} for ${uploadId}`);
+            
+            // Send to Apps Script endpoint
             const response = await fetch(GOOGLE_APPS_SCRIPT_URL, {
                 method: 'POST',
                 body: formData
             });
             
+            // Enhanced error checking
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                const errorText = await response.text();
+                console.error('HTTP error response:', errorText);
+                throw new Error(`HTTP error! status: ${response.status}, body: ${errorText.substring(0, 200)}`);
+            }
+            
+            // Check if response is JSON
+            const contentType = response.headers.get('content-type');
+            if (!contentType || !contentType.includes('application/json')) {
+                const responseText = await response.text();
+                console.error('Non-JSON response:', responseText.substring(0, 200));
+                throw new Error('Server returned non-JSON response. Check Apps Script deployment.');
             }
             
             const result = await response.json();
@@ -138,9 +151,10 @@ async function uploadSingleImage(blob, canvasIndex, imageOrder, retries = MAX_UP
                 uploadState.completed.set(uploadId, result.fileId);
                 uploadState.pending.delete(uploadId);
                 saveUploadStateToLocalStorage();
+                console.log(`Upload successful for ${uploadId}:`, result.fileId);
                 return result.fileId;
             } else {
-                throw new Error(result.error || 'Upload failed');
+                throw new Error(result.error || result.message || 'Upload failed');
             }
             
         } catch (error) {
@@ -239,7 +253,7 @@ function handleUploadError(canvasIndex, imageIndex, error) {
         if (!thumbnail.querySelector('.retry-btn')) {
             const retryBtn = document.createElement('button');
             retryBtn.className = 'retry-btn';
-            retryBtn.innerHTML = '🔄 Retry';
+            retryBtn.innerHTML = '↻ Retry';
             retryBtn.onclick = () => retryUpload(canvasIndex, imageIndex);
             thumbnail.appendChild(retryBtn);
         }
@@ -258,6 +272,10 @@ async function retryUpload(canvasIndex, imageIndex) {
         const retryBtn = thumbnails[imageIndex]?.querySelector('.retry-btn');
         if (retryBtn) retryBtn.remove();
         
+        // Clear failed state
+        const uploadId = `${canvasIndex}_${imageIndex}`;
+        uploadState.failed.delete(uploadId);
+        
         // Show progress
         showUploadProgress(canvasIndex, imageIndex);
         updateUploadProgress(canvasIndex, imageIndex, 30);
@@ -269,6 +287,7 @@ async function retryUpload(canvasIndex, imageIndex) {
             imageData.fileId = fileId;
             imageData.status = 'uploaded';
             updateUploadProgress(canvasIndex, imageIndex, 100, 'completed');
+            saveImagesToLocalStorage();
         }
     } catch (error) {
         handleUploadError(canvasIndex, imageIndex, error);
@@ -298,6 +317,7 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Initialize session
     getOrCreateSessionId();
+    updateSessionStatus(true);
     
     // Initialize character counter and live preview for canvas 0
     const customTextInput = document.getElementById('customText-0');
@@ -378,8 +398,8 @@ function createLivePreviewBox(canvasIndex) {
     return `
         <div class="form-section canvas-item live-preview-section" data-canvas="${canvasIndex}" style="display: none;">
             <div class="live-preview-box ${isCollage ? 'collage-preview' : ''}" id="livePreview-${canvasIndex}" style="height: ${isCollage ? '50px' : '90px'};">
-                <div class="preview-text" id="previewText-${canvasIndex}">Your text will appear here</div>
-                ${!isCollage ? `<div class="preview-date" id="previewDate-${canvasIndex}">Date will appear here</div>` : ''}
+                <div class="preview-text" id="previewText-${canvasIndex}" style="opacity: 0.5;">Your text will appear here</div>
+                ${!isCollage ? `<div class="preview-date" id="previewDate-${canvasIndex}" style="opacity: 0.5;">Date will appear here</div>` : ''}
             </div>
         </div>
     `;
@@ -711,6 +731,11 @@ function generateCanvasHTML(canvasIndex, isCollage = false) {
                 </div>
                 <input type="file" id="imageInput-${canvasIndex}" multiple accept="image/jpeg,image/jpg,image/png" style="display: none;" onchange="handleImageUpload(event, ${canvasIndex})">
                 <div class="image-thumbnails" id="imageThumbnails-${canvasIndex}"></div>
+                <div id="uploadStatus-${canvasIndex}" class="upload-status" style="display: none;">
+                    <span class="upload-icon">📤</span>
+                    <span class="status-text">Uploading...</span>
+                    <span class="loading-spinner"></span>
+                </div>
             </div>
             <div class="validation-error" id="image-error-${canvasIndex}"></div>
         </div>
@@ -1115,6 +1140,12 @@ async function applyCrop() {
     const cropButtons = document.querySelectorAll('#cropModal button');
     cropButtons.forEach(btn => btn.disabled = true);
     
+    // Show processing status
+    const cropStatus = document.getElementById('cropStatus');
+    if (cropStatus) {
+        cropStatus.style.display = 'block';
+    }
+    
     // Get cropped canvas với kích thước gốc (không giới hạn)
     const croppedCanvas = cropper.getCroppedCanvas({
         // Không set width/height cố định - giữ nguyên tỷ lệ 8:10 với resolution cao nhất
@@ -1161,6 +1192,7 @@ async function applyCrop() {
             // Show upload progress
             showUploadProgress(currentCanvasIndex, imageIndex);
             updateUploadProgress(currentCanvasIndex, imageIndex, 20);
+            updateUploadStatusDisplay(currentCanvasIndex, 'uploading', 'Uploading images...');
             
             // Upload to TEMP folder
             try {
@@ -1174,11 +1206,18 @@ async function applyCrop() {
                     
                     // Save to localStorage
                     saveImagesToLocalStorage();
+                    
+                    // Check if all images are uploaded
+                    const allUploaded = uploadedImages[currentCanvasIndex].every(img => img.status === 'uploaded');
+                    if (allUploaded) {
+                        updateUploadStatusDisplay(currentCanvasIndex, false);
+                    }
                 }
             } catch (uploadError) {
                 console.error('Upload failed:', uploadError);
                 tempImageData.status = 'failed';
                 handleUploadError(currentCanvasIndex, imageIndex, uploadError);
+                updateUploadStatusDisplay(currentCanvasIndex, 'failed', 'Upload failed. Please retry.');
             }
             
             // Process next image
@@ -1191,6 +1230,11 @@ async function applyCrop() {
             
             // Re-enable buttons
             cropButtons.forEach(btn => btn.disabled = false);
+            
+            // Hide processing status
+            if (cropStatus) {
+                cropStatus.style.display = 'none';
+            }
         }
     }, 'image/jpeg', 0.95); // Chất lượng JPEG 95%
 }
@@ -1226,6 +1270,16 @@ function closeCropModal() {
     if (cropper) {
         cropper.destroy();
         cropper = null;
+    }
+    
+    // Re-enable buttons
+    const cropButtons = document.querySelectorAll('#cropModal button');
+    cropButtons.forEach(btn => btn.disabled = false);
+    
+    // Hide processing status
+    const cropStatus = document.getElementById('cropStatus');
+    if (cropStatus) {
+        cropStatus.style.display = 'none';
     }
 }
 
@@ -1276,12 +1330,35 @@ function removeImage(canvasIndex, imageIndex) {
     uploadState.completed.delete(uploadId);
     uploadState.failed.delete(uploadId);
     
+    // Re-index remaining images in upload state
+    for (let i = imageIndex; i < uploadedImages[canvasIndex].length; i++) {
+        const oldId = `${canvasIndex}_${i + 1}`;
+        const newId = `${canvasIndex}_${i}`;
+        
+        if (uploadState.completed.has(oldId)) {
+            const fileId = uploadState.completed.get(oldId);
+            uploadState.completed.delete(oldId);
+            uploadState.completed.set(newId, fileId);
+        }
+        
+        if (uploadState.failed.has(oldId)) {
+            const error = uploadState.failed.get(oldId);
+            uploadState.failed.delete(oldId);
+            uploadState.failed.set(newId, error);
+        }
+    }
+    
     // Save to localStorage
     saveImagesToLocalStorage();
     saveUploadStateToLocalStorage();
     
     // Update thumbnails
     updateThumbnails(canvasIndex);
+    
+    // Update upload status display
+    if (uploadedImages[canvasIndex].length === 0) {
+        updateUploadStatusDisplay(canvasIndex, false);
+    }
 }
 
 // UPDATED: Validate form with upload check
@@ -1486,6 +1563,19 @@ function confirmOrder() {
     const summary = generateOrderSummary();
     document.getElementById('orderSummary').innerHTML = summary;
     
+    // Update upload summary status
+    const uploadSummaryStatus = document.getElementById('uploadSummaryStatus');
+    if (uploadSummaryStatus) {
+        const allUploaded = Object.keys(uploadedImages).every(canvasIndex => {
+            const images = uploadedImages[canvasIndex] || [];
+            return images.every(img => img.status === 'uploaded');
+        });
+        
+        if (allUploaded) {
+            uploadSummaryStatus.style.display = 'block';
+        }
+    }
+    
     // Show confirmation modal
     document.getElementById('confirmModal').style.display = 'block';
 }
@@ -1614,6 +1704,7 @@ async function submitOrder() {
         const originalText = submitButton.textContent;
         submitButton.textContent = 'Processing...';
         submitButton.disabled = true;
+        showLoadingOverlay(true);
         
         // Generate order ID
         const fbName = document.getElementById('fbName').value;
@@ -1684,7 +1775,8 @@ async function submitOrder() {
                 value: canvasValue,
                 custom_text: document.getElementById(`customText-${i}`)?.value || '',
                 date: document.getElementById(`date-${i}`)?.value || '',
-                welcome_home: document.getElementById(`welcomeHome-${i}`)?.checked || false
+                welcome_home: document.getElementById(`welcomeHome-${i}`)?.checked || false,
+                two_person: document.getElementById(`twoPersonCanvas-${i}`)?.checked || false
             };
             
             canvases.push(canvasData);
@@ -1782,6 +1874,7 @@ async function submitOrder() {
         
         // 4. Show success page immediately
         setTimeout(() => {
+            showLoadingOverlay(false);
             closeConfirmModal();
             showThankYouPage();
         }, 500);
@@ -1796,6 +1889,7 @@ async function submitOrder() {
             submitButton.textContent = 'Confirm Order';
             submitButton.disabled = false;
         }
+        showLoadingOverlay(false);
     }
 }
 
@@ -1926,5 +2020,44 @@ window.onclick = function(event) {
             return;
         }
         event.target.style.display = 'none';
+    }
+}
+
+// Helper functions from index.html script
+function updateSessionStatus(active) {
+    const sessionStatus = document.getElementById('sessionStatus');
+    if (sessionStatus) {
+        sessionStatus.classList.toggle('active', active);
+    }
+}
+
+function updateUploadStatusDisplay(canvasIndex, status, text) {
+    const statusElement = document.getElementById(`uploadStatus-${canvasIndex}`);
+    if (statusElement) {
+        statusElement.style.display = status ? 'inline-flex' : 'none';
+        if (status) {
+            statusElement.className = `upload-status ${status}`;
+            const statusText = statusElement.querySelector('.status-text');
+            if (statusText) statusText.textContent = text;
+        }
+    }
+}
+
+function updateSubmitButtonState(enabled) {
+    const submitBtn = document.getElementById('submitBtn');
+    if (submitBtn) {
+        submitBtn.disabled = !enabled;
+        if (!enabled) {
+            submitBtn.innerHTML = 'Submit Order <span class="loading-spinner"></span>';
+        } else {
+            submitBtn.innerHTML = 'Submit Order';
+        }
+    }
+}
+
+function showLoadingOverlay(show) {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+        overlay.style.display = show ? 'flex' : 'none';
     }
 }
