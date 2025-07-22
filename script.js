@@ -1257,7 +1257,7 @@ function closeConfirmModal() {
     document.getElementById('confirmModal').style.display = 'none';
 }
 
-// Submit order - UPDATED WITH FIXES
+// Submit order - UPDATED WITH NEW ORDER ID FORMAT
 async function submitOrder() {
     try {
         // Show loading state
@@ -1266,10 +1266,36 @@ async function submitOrder() {
         submitButton.textContent = 'Processing...';
         submitButton.disabled = true;
         
-        // Generate order ID
-        const timestamp = Date.now();
-        const random = Math.random().toString(36).substr(2, 4).toUpperCase();
-        const orderId = `JM_${random}`;
+        // Generate order ID với format mới: JM_fbname_YYYYMMDD_HHMMSS_MS
+        const fbName = document.getElementById('fbName').value;
+        
+        // Chuẩn hóa tên FB cho Order ID
+        const normalizedName = fbName
+            .trim()
+            .toLowerCase()
+            .replace(/[àáạảãâầấậẩẫăằắặẳẵ]/g, 'a')
+            .replace(/[èéẹẻẽêềếệểễ]/g, 'e')
+            .replace(/[ìíịỉĩ]/g, 'i')
+            .replace(/[òóọỏõôồốộổỗơờớợởỡ]/g, 'o')
+            .replace(/[ùúụủũưừứựửữ]/g, 'u')
+            .replace(/[ỳýỵỷỹ]/g, 'y')
+            .replace(/đ/g, 'd')
+            .replace(/[^a-z0-9]/g, '_')
+            .replace(/_+/g, '_')
+            .replace(/^_|_$/g, '')
+            .substring(0, 20);
+        
+        // Format timestamp
+        const now = new Date();
+        const dateStr = now.getFullYear().toString() +
+            (now.getMonth() + 1).toString().padStart(2, '0') +
+            now.getDate().toString().padStart(2, '0');
+        const timeStr = now.getHours().toString().padStart(2, '0') +
+            now.getMinutes().toString().padStart(2, '0') +
+            now.getSeconds().toString().padStart(2, '0');
+        const ms = now.getMilliseconds().toString().padStart(3, '0');
+        
+        const orderId = `JM_${normalizedName}_${dateStr}_${timeStr}_${ms}`;
         
         // Get URL parameters
         const urlParams = new URLSearchParams(window.location.search);
@@ -1328,7 +1354,6 @@ async function submitOrder() {
         }
         
         // Get customer info
-        const fbName = document.getElementById('fbName').value;
         const email = document.getElementById('email').value;
         const phone = document.getElementById('phone').value || '';
         
